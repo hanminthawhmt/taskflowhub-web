@@ -108,3 +108,51 @@ This document lists the recommended API endpoints currently missing from the bac
     ]
   }
   ```
+
+---
+
+### 7. Update Current User Profile
+- **Proposed Endpoint**: `PATCH /users/me`
+- **Method**: `PATCH`
+- **Auth Required**: Yes
+- **Description**: Update profile details (such as full name and email address) for the logged-in user.
+- **Request Body**:
+  ```json
+  {
+    "name": "Jane Doe",
+    "email": "jane@doe.com"
+  }
+  ```
+- **Response Shape**:
+  ```json
+  {
+    "message": "Profile updated successfully",
+    "data": {
+      "id": "user-uuid-1",
+      "name": "Jane Doe",
+      "email": "jane@doe.com"
+    }
+  }
+  ```
+
+---
+
+### 8. Update Current User Password
+- **Proposed Endpoint**: `PUT /users/me/password`
+- **Method**: `PUT`
+- **Auth Required**: Yes
+- **Description**: Securely change the logged-in user's password after validating their current password.
+- **Request Body**:
+  ```json
+  {
+    "currentPassword": "old-password-here",
+    "newPassword": "new-secure-password-here"
+  }
+  ```
+- **Response Shape**:
+  ```json
+  {
+    "message": "Password changed successfully"
+  }
+  ```
+

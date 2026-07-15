@@ -58,10 +58,10 @@ export default function DashboardLayout() {
 
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Projects', path: '/projects', icon: FolderKanban },
-    { name: 'My Tasks', path: '/tasks', icon: CheckSquare },
-    { name: 'Billing', path: '/billing', icon: CreditCard },
-    { name: 'Settings', path: '/settings', icon: Settings },
+    { name: 'Projects', path: '/dashboard/projects', icon: FolderKanban },
+    { name: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+    { name: 'Billing', path: '/dashboard/billing', icon: CreditCard },
+    { name: 'Settings', path: '/dashboard/settings', icon: Settings },
   ]
 
   // Get active page name for breadcrumb
@@ -307,14 +307,14 @@ export default function DashboardLayout() {
                   </div>
 
                   <button
-                    onClick={() => { navigate('/settings'); setUserDropdownOpen(false) }}
+                    onClick={() => { navigate('/dashboard/settings'); setUserDropdownOpen(false) }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
                   >
                     <User size={14} />
                     <span>My Profile</span>
                   </button>
                   <button
-                    onClick={() => { navigate('/settings'); setUserDropdownOpen(false) }}
+                    onClick={() => { navigate('/dashboard/settings'); setUserDropdownOpen(false) }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
                   >
                     <Settings size={14} />
