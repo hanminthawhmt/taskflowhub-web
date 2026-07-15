@@ -1,0 +1,779 @@
+import { useState } from 'react'
+import { useParams, Link } from 'react-router'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as zod from 'zod'
+import { useAuthStore } from '../../../store/useAuthStore'
+import { useProjectDetail, useProjectMembers, useAddProjectMemberMutation } from '../hooks/useProjects'
+import { useProjectTasks, useCreateTaskMutation, useUpdateTaskStatusMutation } from '../../tasks/hooks/useTasks'
+import {
+  ArrowLeft,
+  Users,
+  BookOpen,
+  CheckSquare,
+  UserPlus,
+  Calendar,
+  Clock,
+  Shield,
+  X,
+  Plus,
+  AlertCircle,
+  CheckCircle2,
+  Circle
+} from 'lucide-react'
+import axios from 'axios'
+import { toast } from 'sonner'
+
+// Validation schemas
+const addMemberSchema = zod.object({
+  user_id: zod.string().min(1, 'User ID is required'),
+  role_id: zod.enum(['owner', 'manager', 'developer', 'viewer']),
+})
+
+const createTaskSchema = zod.object({
+  title: zod.string().min(1, 'Task title is required').max(100, 'Title is too long'),
+  description: zod.string().max(500, 'Description is too long').optional(),
+  priority: zod.enum(['high', 'medium', 'low']),
+  user_id: zod.string().optional(),
+  start_date: zod.string().optional(),
+  end_date: zod.string().optional(),
+})
+
+type AddMemberInputs = zod.infer<typeof addMemberSchema>
+type CreateTaskInputs = zod.infer<typeof createTaskSchema>
+
+export default function ProjectDetailPage() {
+  const { projectId } = useParams()
+  const activeCompany = useAuthStore((state) => state.activeCompany)
+  const companyId = activeCompany?.id || 'default-comp'
+
+  // Queries
+  const { data: project, isLoading: projectLoading, isError: projectError } = useProjectDetail(companyId, projectId || '')
+  const { data: members, isLoading: membersLoading } = useProjectMembers(companyId, projectId || '')
+  const { data: tasks, isLoading: tasksLoading, isError: tasksError, refetch: refetchTasks } = useProjectTasks(projectId || '')
+
+  // Mutations
+  const addMemberMutation = useAddProjectMemberMutation(companyId, projectId || '')
+  const createTaskMutation = useCreateTaskMutation(projectId || '')
+  const updateTaskStatusMutation = useUpdateTaskStatusMutation(projectId || '')
+
+  // Component local states
+  const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'tasks'>('overview')
+  const [memberModalOpen, setMemberModalOpen] = useState(false)
+  const [taskModalOpen, setTaskModalOpen] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [taskErrorMsg, setTaskErrorMsg] = useState<string | null>(null)
+  const [taskSearchQuery, setTaskSearchQuery] = useState('')
+
+  // Member form
+  const addMemberForm = useForm<AddMemberInputs>({
+    resolver: zodResolver(addMemberSchema),
+    defaultValues: {
+      user_id: '',
+      role_id: 'developer',
+    },
+  })
+
+  // Task form
+  const createTaskForm = useForm<CreateTaskInputs>({
+    resolver: zodResolver(createTaskSchema),
+    defaultValues: {
+      title: '',
+      description: '',
+      priority: 'medium',
+      user_id: '',
+      start_date: '',
+      end_date: '',
+    },
+  })
+
+  // Form submit handlers
+  const onAddMemberSubmit = async (data: AddMemberInputs) => {
+    try {
+      setErrorMsg(null)
+      await addMemberMutation.mutateAsync(data)
+      addMemberForm.reset()
+      setMemberModalOpen(false)
+      toast.success('Project member added successfully')
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setErrorMsg(err.response?.data?.message || 'Failed to add project member.')
+      } else {
+        setErrorMsg('An unexpected error occurred.')
+      }
+    }
+  }
+
+  const onCreateTaskSubmit = async (data: CreateTaskInputs) => {
+    try {
+      setTaskErrorMsg(null)
+      const payload = {
+        ...data,
+        user_id: data.user_id || undefined,
+        start_date: data.start_date || undefined,
+        end_date: data.end_date || undefined,
+      }
+      await createTaskMutation.mutateAsync(payload)
+      createTaskForm.reset()
+      setTaskModalOpen(false)
+      toast.success('Task created successfully')
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setTaskErrorMsg(err.response?.data?.message || 'Failed to create task.')
+      } else {
+        setTaskErrorMsg('An unexpected error occurred.')
+      }
+    }
+  }
+
+  const handleToggleTaskStatus = async (taskId: string, currentStatus: 'pending' | 'complete') => {
+    const nextStatus = currentStatus === 'pending' ? 'complete' : 'pending'
+    try {
+      await updateTaskStatusMutation.mutateAsync({
+        taskId,
+        data: { status: nextStatus },
+      })
+      toast.success(`Task marked as ${nextStatus}`)
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        // Displays exact message if returned (e.g. only assignee can update status)
+        toast.error(err.response?.data?.message || 'Only the task assignee can update its status.')
+      } else {
+        toast.error('An unexpected error occurred.')
+      }
+    }
+  }
+
+  if (projectLoading) {
+    return (
+      <div className="p-8 max-w-7xl mx-auto space-y-6 animate-pulse">
+        <div className="h-6 bg-slate-200 dark:bg-slate-800 rounded w-1/4"></div>
+        <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded w-1/2"></div>
+        <div className="h-48 bg-slate-200 dark:bg-slate-800 rounded"></div>
+      </div>
+    )
+  }
+
+  if (projectError || !project) {
+    return (
+      <div className="p-8 max-w-md mx-auto text-center space-y-4">
+        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Project not found</h3>
+        <p className="text-sm text-slate-500">The project you are looking for does not exist or has been deleted.</p>
+        <Link to="/dashboard/projects" className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400">
+          <ArrowLeft size={16} /> Back to Projects
+        </Link>
+      </div>
+    )
+  }
+
+  // Filter and split tasks
+  const filteredTasks = tasks?.filter(t => 
+    t.title.toLowerCase().includes(taskSearchQuery.toLowerCase())
+  ) || []
+  
+  const pendingTasks = filteredTasks.filter(t => t.status === 'pending')
+  const completedTasks = filteredTasks.filter(t => t.status === 'complete')
+
+  return (
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+
+      {/* Back navigation and header */}
+      <div className="space-y-3">
+        <Link
+          to="/dashboard/projects"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 transition-colors"
+        >
+          <ArrowLeft size={14} />
+          <span>Back to Projects</span>
+        </Link>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+              {project.title}
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Parent workspace: <span className="font-semibold text-slate-700 dark:text-slate-300">{activeCompany?.name}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6">
+        {(
+          [
+            { id: 'overview', name: 'Overview', icon: BookOpen },
+            { id: 'members', name: 'Members', icon: Users },
+            { id: 'tasks', name: 'Tasks', icon: CheckSquare },
+          ] as const
+        ).map((tab) => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 pb-3.5 text-sm font-medium border-b-2 transition-all cursor-pointer ${
+                activeTab === tab.id
+                  ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 font-semibold'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+              }`}
+            >
+              <Icon size={16} />
+              <span>{tab.name}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tab Panels */}
+      <div className="mt-4">
+
+        {/* OVERVIEW PANEL */}
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+                <h3 className="font-bold text-lg text-slate-950 dark:text-white">About Project</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {project.description || 'No description provided for this project.'}
+                </p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+                <h3 className="font-bold text-lg text-slate-950 dark:text-white">Timeline & Milestones</h3>
+                <div className="space-y-4">
+                  <div className="flex gap-4 items-start">
+                    <div className="h-8 w-8 min-w-[32px] rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center font-bold text-xs">
+                      1
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold">Project Setup</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Project repository created and workspace environment defined.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4 items-start">
+                    <div className="h-8 w-8 min-w-[32px] rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 flex items-center justify-center font-bold text-xs">
+                      2
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold">Tasks Integration</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Kanban sprint board listing and status toggle settings.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm space-y-4">
+              <h3 className="font-bold text-lg text-slate-950 dark:text-white">Details</h3>
+              <div className="space-y-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Created</span>
+                  <span className="font-medium flex items-center gap-1.5 dark:text-slate-200">
+                    <Calendar size={14} className="text-slate-400" />
+                    {new Date(project.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Updated</span>
+                  <span className="font-medium flex items-center gap-1.5 dark:text-slate-200">
+                    <Clock size={14} className="text-slate-400" />
+                    {new Date(project.updatedAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Members Count</span>
+                  <span className="font-medium flex items-center gap-1.5 dark:text-slate-200">
+                    <Users size={14} className="text-slate-400" />
+                    {members?.length || 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MEMBERS PANEL */}
+        {activeTab === 'members' && (
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden animate-fade-in space-y-4 p-6">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div>
+                <h3 className="font-bold text-lg text-slate-950 dark:text-white">Project Members</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">List of users who have direct access to this project.</p>
+              </div>
+              <button
+                onClick={() => { setErrorMsg(null); setMemberModalOpen(true) }}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg cursor-pointer"
+              >
+                <UserPlus size={14} />
+                <span>Add Member</span>
+              </button>
+            </div>
+
+            {membersLoading ? (
+              <div className="space-y-3 animate-pulse py-4">
+                <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded"></div>
+                <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded"></div>
+              </div>
+            ) : members && members.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <th className="py-3 px-4">User</th>
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4 text-right">Project Role</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                    {members.map((member) => (
+                      <tr key={member.id} className="text-sm">
+                        <td className="py-3.5 px-4 flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center uppercase text-xs">
+                            {member.user.name.charAt(0)}
+                          </div>
+                          <span className="font-semibold text-slate-900 dark:text-slate-200">{member.user.name}</span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">{member.user.email}</td>
+                        <td className="py-3.5 px-4 text-right">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-full ${
+                              member.roleId === 'owner'
+                                ? 'bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400'
+                                : member.roleId === 'manager'
+                                  ? 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950/20 dark:text-yellow-400'
+                                  : member.roleId === 'developer'
+                                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400'
+                                    : 'bg-slate-50 text-slate-650 dark:text-slate-400'
+                            }`}
+                          >
+                            <Shield size={12} />
+                            <span className="capitalize">{member.roleId}</span>
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <Users size={32} className="mx-auto text-slate-300 mb-2" />
+                <p className="text-sm text-slate-500">No project members listed.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* KANBAN TASKS PANEL */}
+        {activeTab === 'tasks' && (
+          <div className="space-y-6 animate-fade-in">
+            {/* Header Actions */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 w-full sm:w-80">
+                <Calendar size={16} className="text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search project tasks..."
+                  value={taskSearchQuery}
+                  onChange={(e) => setTaskSearchQuery(e.target.value)}
+                  className="bg-transparent border-0 outline-none text-xs w-full focus:ring-0 dark:text-white"
+                />
+              </div>
+              <button
+                onClick={() => { setTaskErrorMsg(null); setTaskModalOpen(true) }}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg cursor-pointer shadow-sm shadow-blue-500/10"
+              >
+                <Plus size={16} />
+                <span>Add Task</span>
+              </button>
+            </div>
+
+            {tasksLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+                <div className="h-64 bg-slate-100 dark:bg-slate-900 rounded-xl"></div>
+                <div className="h-64 bg-slate-100 dark:bg-slate-900 rounded-xl"></div>
+              </div>
+            ) : tasksError ? (
+              <div className="flex flex-col items-center justify-center p-12 text-center bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl">
+                <AlertCircle size={40} className="text-red-500 mb-2" />
+                <h3 className="font-bold text-base text-slate-950 dark:text-white">Failed to load tasks</h3>
+                <button
+                  onClick={() => refetchTasks()}
+                  className="mt-3 inline-flex items-center justify-center px-3 py-1.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 rounded-lg text-xs font-semibold"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              /* Two Column Kanban Board */
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* 1. Pending Column */}
+                <div className="bg-slate-100/50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/80 space-y-4 min-h-[350px]">
+                  <div className="flex items-center justify-between px-2">
+                    <span className="font-bold text-sm text-slate-700 dark:text-slate-300">Pending Tasks</span>
+                    <span className="px-2 py-0.5 text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full">
+                      {pendingTasks.length}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {pendingTasks.length > 0 ? (
+                      pendingTasks.map(task => {
+                        const assignee = members?.find(m => m.userId === task.user_id)
+                        return (
+                          <div 
+                            key={task.id} 
+                            className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-3 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+                          >
+                            <div className="flex items-start gap-3">
+                              <button
+                                onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                                disabled={updateTaskStatusMutation.isPending}
+                                className="mt-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
+                              >
+                                <Circle size={18} />
+                              </button>
+                              <div className="space-y-1">
+                                <h4 className="font-semibold text-sm text-slate-900 dark:text-white leading-tight">
+                                  {task.title}
+                                </h4>
+                                {task.description && (
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                                    {task.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-50 dark:border-slate-800/40">
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-block px-1.5 py-0.5 text-[9px] font-bold rounded uppercase ${
+                                  task.priority === 'high' 
+                                    ? 'bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400' 
+                                    : task.priority === 'medium'
+                                      ? 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950/20'
+                                      : 'bg-green-50 text-green-600 dark:bg-green-950/20'
+                                }`}>
+                                  {task.priority}
+                                </span>
+                                {task.end_date && (
+                                  <span className="text-[10px] text-slate-400">
+                                    Due: {new Date(task.end_date).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+
+                              {assignee && (
+                                <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase shadow-sm" title={assignee.user.name}>
+                                  {assignee.user.name.charAt(0)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="text-center py-12 text-slate-400 text-xs">
+                        No pending tasks.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Complete Column */}
+                <div className="bg-slate-100/50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/80 space-y-4 min-h-[350px]">
+                  <div className="flex items-center justify-between px-2">
+                    <span className="font-bold text-sm text-slate-700 dark:text-slate-300">Completed Tasks</span>
+                    <span className="px-2 py-0.5 text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full">
+                      {completedTasks.length}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {completedTasks.length > 0 ? (
+                      completedTasks.map(task => {
+                        const assignee = members?.find(m => m.userId === task.user_id)
+                        return (
+                          <div 
+                            key={task.id} 
+                            className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-3 opacity-75"
+                          >
+                            <div className="flex items-start gap-3">
+                              <button
+                                onClick={() => handleToggleTaskStatus(task.id, task.status)}
+                                disabled={updateTaskStatusMutation.isPending}
+                                className="mt-0.5 text-green-500 hover:text-slate-400 cursor-pointer"
+                              >
+                                <CheckCircle2 size={18} className="fill-green-50 dark:fill-green-950/20" />
+                              </button>
+                              <div className="space-y-1">
+                                <h4 className="font-semibold text-sm text-slate-400 dark:text-slate-500 line-through leading-tight">
+                                  {task.title}
+                                </h4>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-50 dark:border-slate-800/40">
+                              <span className="inline-block px-1.5 py-0.5 text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-400 rounded uppercase">
+                                Completed
+                              </span>
+                              {assignee && (
+                                <div className="h-5 w-5 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[9px] font-bold text-slate-400 uppercase shadow-sm" title={assignee.user.name}>
+                                  {assignee.user.name.charAt(0)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div className="text-center py-12 text-slate-400 text-xs">
+                        No completed tasks.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Add Project Member Modal Dialog */}
+      {memberModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-lg w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-lg font-bold text-slate-950 dark:text-white">Add Project Member</h3>
+              <button
+                onClick={() => setMemberModalOpen(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {errorMsg && (
+              <div className="mx-6 mt-4 p-3 bg-red-50 text-red-600 border border-red-100 text-sm rounded-lg dark:bg-red-950/30 dark:border-red-900 dark:text-red-400">
+                {errorMsg}
+              </div>
+            )}
+
+            {/* Modal Form */}
+            <form onSubmit={addMemberForm.handleSubmit(onAddMemberSubmit)} className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  User ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. user-uuid-here"
+                  disabled={addMemberMutation.isPending}
+                  {...addMemberForm.register('user_id')}
+                  className={`mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 dark:bg-gray-900 dark:text-white ${
+                    addMemberForm.formState.errors.user_id ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-200 dark:border-slate-800'
+                  }`}
+                />
+                {addMemberForm.formState.errors.user_id && (
+                  <p className="mt-1.5 text-xs text-red-500">{addMemberForm.formState.errors.user_id.message}</p>
+                )}
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Directly add an existing company user to this project.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Project Role <span className="text-red-500">*</span>
+                </label>
+                <select
+                  disabled={addMemberMutation.isPending}
+                  {...addMemberForm.register('role_id')}
+                  className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                >
+                  <option value="developer">Developer</option>
+                  <option value="manager">Manager</option>
+                  <option value="viewer">Viewer</option>
+                  <option value="owner">Owner</option>
+                </select>
+                {addMemberForm.formState.errors.role_id && (
+                  <p className="mt-1.5 text-xs text-red-500">{addMemberForm.formState.errors.role_id.message}</p>
+                )}
+              </div>
+
+              {/* Form Footer Actions */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={addMemberMutation.isPending}
+                  onClick={() => setMemberModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addMemberMutation.isPending}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg cursor-pointer disabled:opacity-50"
+                >
+                  {addMemberMutation.isPending ? 'Adding...' : 'Add Member'}
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* Create Task Modal Dialog */}
+      {taskModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-lg w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-lg font-bold text-slate-950 dark:text-white">Add New Task</h3>
+              <button
+                onClick={() => setTaskModalOpen(false)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {taskErrorMsg && (
+              <div className="mx-6 mt-4 p-3 bg-red-50 text-red-600 border border-red-100 text-sm rounded-lg dark:bg-red-950/30 dark:border-red-900 dark:text-red-400">
+                {taskErrorMsg}
+              </div>
+            )}
+
+            {/* Modal Form */}
+            <form onSubmit={createTaskForm.handleSubmit(onCreateTaskSubmit)} className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Task Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Design Dashboard Prototypes"
+                  disabled={createTaskMutation.isPending}
+                  {...createTaskForm.register('title')}
+                  className={`mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 dark:bg-gray-900 dark:text-white ${
+                    createTaskForm.formState.errors.title ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-200 dark:border-slate-800'
+                  }`}
+                />
+                {createTaskForm.formState.errors.title && (
+                  <p className="mt-1.5 text-xs text-red-500">{createTaskForm.formState.errors.title.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Description
+                </label>
+                <textarea
+                  placeholder="Summarize the work required..."
+                  disabled={createTaskMutation.isPending}
+                  rows={3}
+                  {...createTaskForm.register('description')}
+                  className={`mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 dark:bg-gray-900 dark:text-white ${
+                    createTaskForm.formState.errors.description ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-200 dark:border-slate-800'
+                  }`}
+                />
+                {createTaskForm.formState.errors.description && (
+                  <p className="mt-1.5 text-xs text-red-500">{createTaskForm.formState.errors.description.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Priority <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    disabled={createTaskMutation.isPending}
+                    {...createTaskForm.register('priority')}
+                    className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none"
+                  >
+                    <option value="low">Low Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="high">High Priority</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Assignee User
+                  </label>
+                  <select
+                    disabled={createTaskMutation.isPending}
+                    {...createTaskForm.register('user_id')}
+                    className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none"
+                  >
+                    <option value="">Unassigned</option>
+                    {members?.map(m => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.user.name} ({m.roleId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    disabled={createTaskMutation.isPending}
+                    {...createTaskForm.register('start_date')}
+                    className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    End Date / Due Date
+                  </label>
+                  <input
+                    type="date"
+                    disabled={createTaskMutation.isPending}
+                    {...createTaskForm.register('end_date')}
+                    className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Form Footer Actions */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={createTaskMutation.isPending}
+                  onClick={() => setTaskModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={createTaskMutation.isPending}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg cursor-pointer disabled:opacity-50"
+                >
+                  {createTaskMutation.isPending ? 'Creating...' : 'Create Task'}
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
+}
