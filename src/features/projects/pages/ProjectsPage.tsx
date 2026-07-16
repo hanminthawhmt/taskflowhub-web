@@ -17,7 +17,7 @@ type CreateProjectInputs = zod.infer<typeof createProjectSchema>
 
 export default function ProjectsPage() {
   const activeCompany = useAuthStore((state) => state.activeCompany)
-  const companyId = activeCompany?.id || 'default-comp'
+  const companyId = activeCompany?.id || 1
 
   const { data: projects, isLoading, isError, refetch } = useCompanyProjects(companyId)
   const createMutation = useCreateProjectMutation(companyId)

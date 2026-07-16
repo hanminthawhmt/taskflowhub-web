@@ -1,18 +1,21 @@
 export interface Project {
-  id: string
+  id: number
   title: string
   description?: string
-  companyId: string
-  ownerId: string
+  companyId: number
+  ownerId?: number
+  memberCount?: number
+  taskCount?: number
   createdAt: string
   updatedAt: string
 }
 
 export interface ProjectMember {
-  id: string
-  userId: string
-  projectId: string
-  roleId: string
+  id: number
+  userId: number
+  projectId: number
+  roleId: number | string
+  roleTitle?: string
   user: {
     name: string;
     email: string;
@@ -25,6 +28,6 @@ export interface CreateProjectRequest {
 }
 
 export interface AddProjectMemberRequest {
-  user_id: string
+  user_id: number | string
   role_id: string
 }

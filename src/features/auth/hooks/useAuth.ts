@@ -1,8 +1,15 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { authService } from '../services/auth.service'
 import { useAuthStore } from '../../../store/useAuthStore'
 import type { LoginRequest, RegisterRequest, Company } from '../types/auth'
+
+export function useCompaniesQuery() {
+  return useQuery({
+    queryKey: ['auth', 'companies'],
+    queryFn: () => authService.getCompanies(),
+  })
+}
 
 interface NestedUserResponse {
   id: string
@@ -35,13 +42,13 @@ export function useAuth() {
           activeCompany = userWithCompany.companies[0]
         } else if (!activeCompany && userWithCompany.companyId) {
           activeCompany = {
-            id: userWithCompany.companyId,
+            id: Number(userWithCompany.companyId),
             name: userWithCompany.companyName || 'My Company',
           }
         }
       }
 
-      const finalUser = data?.user || { id: 'usr-default', name: 'User', email: '' }
+      const finalUser = data?.user || { id: 0, name: 'User', email: '' }
       const finalToken = data?.token || ''
 
       setAuth(finalUser, finalToken, activeCompany)

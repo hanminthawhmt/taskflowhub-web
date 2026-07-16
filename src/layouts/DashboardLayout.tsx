@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router'
 import { useAuthStore } from '../store/useAuthStore'
 import { useUiStore } from '../store/useUiStore'
+import { useCompaniesQuery } from '../features/auth/hooks/useAuth'
 import {
   LayoutDashboard,
   FolderKanban,
@@ -30,13 +31,20 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Generate a mock list of companies based on user context
-  const companiesList = user
-    ? [
-        { id: user.id + '-comp', name: activeCompany?.name || 'Default Company' },
-        { id: 'mock-comp-2', name: 'Personal Workspace' }
-      ]
-    : []
+  const { data: apiCompanies } = useCompaniesQuery()
+
+  // Auto-initialize active company context if not set yet
+  useEffect(() => {
+    if (!activeCompany && apiCompanies && apiCompanies.length > 0) {
+      setActiveCompany(apiCompanies[0])
+    }
+  }, [activeCompany, apiCompanies, setActiveCompany])
+
+  const companiesList = apiCompanies && apiCompanies.length > 0
+    ? apiCompanies
+    : activeCompany
+      ? [activeCompany]
+      : []
 
 
   // Sync theme with document class on mount
@@ -51,8 +59,8 @@ export default function DashboardLayout() {
     navigate('/login', { replace: true })
   }
 
-  const handleCompanyChange = (company: { id: string; name: string }) => {
-    setActiveCompany({ id: company.id, name: company.name })
+  const handleCompanyChange = (company: { id: number | string; name: string }) => {
+    setActiveCompany({ id: Number(company.id), name: company.name })
     setCompanyDropdownOpen(false)
   }
 

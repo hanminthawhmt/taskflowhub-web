@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as zod from 'zod'
 import { useAuthStore } from '../../../store/useAuthStore'
-import { useProjectDetail, useProjectMembers, useAddProjectMemberMutation } from '../hooks/useProjects'
+import { useProjectDetail, useProjectMembers, useAddProjectMemberMutation, useCompanyMembers } from '../hooks/useProjects'
 import { useProjectTasks, useCreateTaskMutation, useUpdateTaskStatusMutation } from '../../tasks/hooks/useTasks'
 import {
   ArrowLeft,
@@ -45,11 +45,12 @@ type CreateTaskInputs = zod.infer<typeof createTaskSchema>
 export default function ProjectDetailPage() {
   const { projectId } = useParams()
   const activeCompany = useAuthStore((state) => state.activeCompany)
-  const companyId = activeCompany?.id || 'default-comp'
+  const companyId = activeCompany?.id || 1
 
   // Queries
   const { data: project, isLoading: projectLoading, isError: projectError } = useProjectDetail(companyId, projectId || '')
   const { data: members, isLoading: membersLoading } = useProjectMembers(companyId, projectId || '')
+  const { data: companyMembers } = useCompanyMembers(companyId)
   const { data: tasks, isLoading: tasksLoading, isError: tasksError, refetch: refetchTasks } = useProjectTasks(projectId || '')
 
   // Mutations
@@ -126,7 +127,7 @@ export default function ProjectDetailPage() {
     }
   }
 
-  const handleToggleTaskStatus = async (taskId: string, currentStatus: 'pending' | 'complete') => {
+  const handleToggleTaskStatus = async (taskId: number | string, currentStatus: 'pending' | 'complete') => {
     const nextStatus = currentStatus === 'pending' ? 'complete' : 'pending'
     try {
       await updateTaskStatusMutation.mutateAsync({
@@ -338,18 +339,21 @@ export default function ProjectDetailPage() {
                         <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">{member.user.email}</td>
                         <td className="py-3.5 px-4 text-right">
                           <span
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-full ${
-                              member.roleId === 'owner'
-                                ? 'bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400'
-                                : member.roleId === 'manager'
-                                  ? 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950/20 dark:text-yellow-400'
-                                  : member.roleId === 'developer'
-                                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400'
-                                    : 'bg-slate-50 text-slate-650 dark:text-slate-400'
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-full border ${
+                              (() => {
+                                const title = (member.roleTitle || String(member.roleId)).toLowerCase()
+                                return title === 'owner' || title === '1'
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-150 dark:bg-indigo-950/20 dark:text-indigo-400 dark:border-indigo-900/50'
+                                  : title === 'manager' || title === '3'
+                                    ? 'bg-amber-50 text-amber-700 border-amber-150 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50'
+                                    : title === 'developer' || title === 'member' || title === '2'
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-150 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/50'
+                                      : 'bg-slate-50 text-slate-650 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                              })()
                             }`}
                           >
                             <Shield size={12} />
-                            <span className="capitalize">{member.roleId}</span>
+                            <span className="capitalize">{member.roleTitle || member.roleId}</span>
                           </span>
                         </td>
                       </tr>
@@ -422,7 +426,8 @@ export default function ProjectDetailPage() {
                   <div className="space-y-3">
                     {pendingTasks.length > 0 ? (
                       pendingTasks.map(task => {
-                        const assignee = members?.find(m => m.userId === task.user_id)
+                        const assigneeUser = task.assignee || members?.find(m => Number(m.userId) === Number(task.user_id))?.user
+                        const assigneeName = assigneeUser?.name || ''
                         return (
                           <div 
                             key={task.id} 
@@ -459,16 +464,19 @@ export default function ProjectDetailPage() {
                                 }`}>
                                   {task.priority}
                                 </span>
-                                {task.end_date && (
-                                  <span className="text-[10px] text-slate-400">
-                                    Due: {new Date(task.end_date).toLocaleDateString()}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const dDate = task.endDate || task.startDate
+                                  return dDate ? (
+                                    <span className="text-[10px] text-slate-400">
+                                      Due: {new Date(dDate).toLocaleDateString()}
+                                    </span>
+                                  ) : null
+                                })()}
                               </div>
 
-                              {assignee && (
-                                <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase shadow-sm" title={assignee.user.name}>
-                                  {assignee.user.name.charAt(0)}
+                              {assigneeUser && assigneeName && (
+                                <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase shadow-sm" title={assigneeName}>
+                                  {assigneeName.charAt(0)}
                                 </div>
                               )}
                             </div>
@@ -495,7 +503,8 @@ export default function ProjectDetailPage() {
                   <div className="space-y-3">
                     {completedTasks.length > 0 ? (
                       completedTasks.map(task => {
-                        const assignee = members?.find(m => m.userId === task.user_id)
+                        const assigneeUser = task.assignee || members?.find(m => Number(m.userId) === Number(task.user_id))?.user
+                        const assigneeName = assigneeUser?.name || ''
                         return (
                           <div 
                             key={task.id} 
@@ -520,9 +529,9 @@ export default function ProjectDetailPage() {
                               <span className="inline-block px-1.5 py-0.5 text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-400 rounded uppercase">
                                 Completed
                               </span>
-                              {assignee && (
-                                <div className="h-5 w-5 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[9px] font-bold text-slate-400 uppercase shadow-sm" title={assignee.user.name}>
-                                  {assignee.user.name.charAt(0)}
+                              {assigneeUser && assigneeName && (
+                                <div className="h-5 w-5 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[9px] font-bold text-slate-400 uppercase shadow-sm" title={assigneeName}>
+                                  {assigneeName.charAt(0)}
                                 </div>
                               )}
                             </div>
@@ -569,17 +578,22 @@ export default function ProjectDetailPage() {
             <form onSubmit={addMemberForm.handleSubmit(onAddMemberSubmit)} className="px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  User ID <span className="text-red-500">*</span>
+                  Select Member <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. user-uuid-here"
+                <select
                   disabled={addMemberMutation.isPending}
                   {...addMemberForm.register('user_id')}
-                  className={`mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 dark:bg-gray-900 dark:text-white ${
-                    addMemberForm.formState.errors.user_id ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' : 'border-slate-200 dark:border-slate-800'
+                  className={`mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${
+                    addMemberForm.formState.errors.user_id ? 'border-red-500' : ''
                   }`}
-                />
+                >
+                  <option value="">Choose a company member...</option>
+                  {companyMembers?.map((m) => (
+                    <option key={m.userId} value={String(m.userId)}>
+                      {m.user.name} ({m.user.email})
+                    </option>
+                  ))}
+                </select>
                 {addMemberForm.formState.errors.user_id && (
                   <p className="mt-1.5 text-xs text-red-500">{addMemberForm.formState.errors.user_id.message}</p>
                 )}
@@ -716,8 +730,8 @@ export default function ProjectDetailPage() {
                   >
                     <option value="">Unassigned</option>
                     {members?.map(m => (
-                      <option key={m.userId} value={m.userId}>
-                        {m.user.name} ({m.roleId})
+                      <option key={m.userId} value={String(m.userId)}>
+                        {m.user.name} ({m.roleTitle || m.roleId})
                       </option>
                     ))}
                   </select>

@@ -1,13 +1,18 @@
 export interface Task {
-  id: string
+  id: number | string
   title: string
   description?: string
   priority: 'high' | 'medium' | 'low'
   status: 'pending' | 'complete'
-  start_date?: string
-  end_date?: string
-  user_id?: string
-  projectId: string
+  startDate?: string | null
+  endDate?: string | null
+  assignee?: {
+    id: number
+    name: string
+    email: string
+  } | null
+  user_id?: number | string
+  projectId: number | string
   createdAt: string
   updatedAt: string
 }
@@ -19,7 +24,7 @@ export interface CreateTaskRequest {
   status?: 'pending' | 'complete'
   start_date?: string
   end_date?: string
-  user_id?: string
+  user_id?: number | string
 }
 
 export interface UpdateTaskStatusRequest {

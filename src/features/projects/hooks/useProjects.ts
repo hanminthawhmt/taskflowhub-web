@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { projectService } from '../services/project.service'
 import type { CreateProjectRequest, AddProjectMemberRequest } from '../types/project'
 
-export function useCompanyProjects(companyId: string) {
+export function useCompanyProjects(companyId: number | string) {
   return useQuery({
     queryKey: ['projects', companyId],
     queryFn: () => projectService.getProjects(companyId),
@@ -10,7 +10,7 @@ export function useCompanyProjects(companyId: string) {
   })
 }
 
-export function useProjectDetail(companyId: string, projectId: string) {
+export function useProjectDetail(companyId: number | string, projectId: number | string) {
   return useQuery({
     queryKey: ['project', companyId, projectId],
     queryFn: () => projectService.getProjectById(companyId, projectId),
@@ -18,7 +18,7 @@ export function useProjectDetail(companyId: string, projectId: string) {
   })
 }
 
-export function useProjectMembers(companyId: string, projectId: string) {
+export function useProjectMembers(companyId: number | string, projectId: number | string) {
   return useQuery({
     queryKey: ['project-members', companyId, projectId],
     queryFn: () => projectService.getProjectMembers(companyId, projectId),
@@ -26,7 +26,15 @@ export function useProjectMembers(companyId: string, projectId: string) {
   })
 }
 
-export function useCreateProjectMutation(companyId: string) {
+export function useCompanyMembers(companyId: number | string) {
+  return useQuery({
+    queryKey: ['company-members', companyId],
+    queryFn: () => projectService.getCompanyMembers(companyId),
+    enabled: !!companyId,
+  })
+}
+
+export function useCreateProjectMutation(companyId: number | string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (data: CreateProjectRequest) => projectService.createProject(companyId, data),
@@ -36,7 +44,7 @@ export function useCreateProjectMutation(companyId: string) {
   })
 }
 
-export function useAddProjectMemberMutation(companyId: string, projectId: string) {
+export function useAddProjectMemberMutation(companyId: number | string, projectId: number | string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (data: AddProjectMemberRequest) =>

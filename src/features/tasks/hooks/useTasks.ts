@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { taskService } from '../services/task.service'
 import type { CreateTaskRequest, UpdateTaskStatusRequest } from '../types/task'
 
-export function useProjectTasks(projectId: string) {
+export function useProjectTasks(projectId: number | string) {
   return useQuery({
     queryKey: ['tasks', projectId],
     queryFn: () => taskService.getProjectTasks(projectId),
@@ -10,7 +10,7 @@ export function useProjectTasks(projectId: string) {
   })
 }
 
-export function useMyTasks(projectId: string) {
+export function useMyTasks(projectId: number | string) {
   return useQuery({
     queryKey: ['my-tasks', projectId],
     queryFn: () => taskService.getMyTasks(projectId),
@@ -18,7 +18,7 @@ export function useMyTasks(projectId: string) {
   })
 }
 
-export function useCreateTaskMutation(projectId: string) {
+export function useCreateTaskMutation(projectId: number | string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (data: CreateTaskRequest) => taskService.createTask(projectId, data),
@@ -29,10 +29,10 @@ export function useCreateTaskMutation(projectId: string) {
   })
 }
 
-export function useUpdateTaskStatusMutation(projectId: string) {
+export function useUpdateTaskStatusMutation(projectId: number | string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ taskId, data }: { taskId: string; data: UpdateTaskStatusRequest }) =>
+    mutationFn: ({ taskId, data }: { taskId: number | string; data: UpdateTaskStatusRequest }) =>
       taskService.updateTaskStatus(projectId, taskId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] })

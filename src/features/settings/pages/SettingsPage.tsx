@@ -5,6 +5,8 @@ import * as zod from 'zod'
 import { useAuthStore } from '../../../store/useAuthStore'
 import { User, Shield, Building } from 'lucide-react'
 import { toast } from 'sonner'
+import { authService } from '../../auth/services/auth.service'
+import axios from 'axios'
 
 // Schemas
 const profileSchema = zod.object({
@@ -14,8 +16,8 @@ const profileSchema = zod.object({
 
 const passwordSchema = zod.object({
   currentPassword: zod.string().min(1, 'Current password is required'),
-  newPassword: zod.string().min(6, 'New password must be at least 6 characters'),
-  confirmPassword: zod.string().min(6, 'Confirm password must be at least 6 characters'),
+  newPassword: zod.string().min(8, 'New password must be at least 8 characters'),
+  confirmPassword: zod.string().min(8, 'Confirm password must be at least 8 characters'),
 }).refine(data => data.newPassword === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
@@ -63,18 +65,39 @@ export default function SettingsPage() {
   })
 
   // Submit Handlers
-  const onProfileSubmit = (data: ProfileInputs) => {
-    if (user) {
-      const updatedUser = { ...user, name: data.name, email: data.email }
-      const token = localStorage.getItem('token') || ''
-      setAuth(updatedUser, token, activeCompany || undefined)
-      toast.success('Profile updated successfully (Mock Synced)')
+  const onProfileSubmit = async (data: ProfileInputs) => {
+    try {
+      const res = await authService.updateProfile(data)
+      if (user) {
+        const updatedUser = { ...user, name: res.data.name, email: res.data.email }
+        const token = localStorage.getItem('token') || ''
+        setAuth(updatedUser, token, activeCompany || undefined)
+        toast.success('Profile updated successfully!')
+      }
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || 'Failed to update profile.')
+      } else {
+        toast.error('An unexpected error occurred.')
+      }
     }
   }
 
-  const onPasswordSubmit = () => {
-    passwordForm.reset()
-    toast.success('Password updated successfully (Mock Synced)')
+  const onPasswordSubmit = async (data: PasswordInputs) => {
+    try {
+      await authService.updatePassword({
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      })
+      passwordForm.reset()
+      toast.success('Password updated successfully!')
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || 'Failed to update password.')
+      } else {
+        toast.error('An unexpected error occurred.')
+      }
+    }
   }
 
   const onWorkspaceSubmit = (data: WorkspaceInputs) => {

@@ -1,15 +1,20 @@
 export interface User {
-  id: string
+  id: number
   name: string
   email: string
   platformRole?: 'user' | 'super_admin'
 }
 
 export interface Company {
-  id: string
+  id: number
   name: string
-  planId?: string
+  planId?: number
+  planName?: string
+  subscriptionStatus?: string
+  role?: string
+  roleId?: number
   tier?: 'free' | 'starter' | 'pro' | 'enterprise'
+  createdAt?: string
 }
 
 export interface AuthResponse {

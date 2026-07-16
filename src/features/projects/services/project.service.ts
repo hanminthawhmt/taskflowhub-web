@@ -1,7 +1,6 @@
 import { apiClient } from '../../../api/client'
 import type { Project, ProjectMember, CreateProjectRequest, AddProjectMemberRequest } from '../types/project'
 
-// Helper keys for local mock storage
 const PROJECTS_LOCAL_KEY = 'mock_projects'
 const MEMBERS_LOCAL_KEY = 'mock_project_members'
 
@@ -9,20 +8,20 @@ const initializeMockData = () => {
   if (!localStorage.getItem(PROJECTS_LOCAL_KEY)) {
     const defaultProjects: Project[] = [
       {
-        id: 'proj-default-1',
+        id: 10001,
         title: 'Acme SaaS Frontend',
         description: 'React + Vite UI dashboard redesign project.',
-        companyId: 'default-comp',
-        ownerId: 'default-owner',
+        companyId: 1,
+        ownerId: 3,
         createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
         updatedAt: new Date().toISOString()
       },
       {
-        id: 'proj-default-2',
+        id: 10002,
         title: 'Backend API Migration',
         description: 'Migrating Prisma ORM and seeding database structures.',
-        companyId: 'default-comp',
-        ownerId: 'default-owner',
+        companyId: 1,
+        ownerId: 3,
         createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -32,29 +31,32 @@ const initializeMockData = () => {
 
   if (!localStorage.getItem(MEMBERS_LOCAL_KEY)) {
     const defaultMembers: Record<string, ProjectMember[]> = {
-      'proj-default-1': [
+      '10001': [
         {
-          id: 'mem-1',
-          userId: 'usr-1',
-          projectId: 'proj-default-1',
-          roleId: 'owner',
-          user: { name: 'John Doe', email: 'john@saas.com' }
+          id: 20001,
+          userId: 3,
+          projectId: 10001,
+          roleId: 1,
+          roleTitle: 'Owner',
+          user: { name: 'Han Min', email: 'han@example.com' }
         },
         {
-          id: 'mem-2',
-          userId: 'usr-2',
-          projectId: 'proj-default-1',
-          roleId: 'developer',
-          user: { name: 'Alice Smith', email: 'alice@saas.com' }
+          id: 20002,
+          userId: 7,
+          projectId: 10001,
+          roleId: 2,
+          roleTitle: 'Developer',
+          user: { name: 'Jane Doe', email: 'jane@doe.com' }
         }
       ],
-      'proj-default-2': [
+      '10002': [
         {
-          id: 'mem-3',
-          userId: 'usr-1',
-          projectId: 'proj-default-2',
-          roleId: 'owner',
-          user: { name: 'John Doe', email: 'john@saas.com' }
+          id: 20003,
+          userId: 3,
+          projectId: 10002,
+          roleId: 1,
+          roleTitle: 'Owner',
+          user: { name: 'Han Min', email: 'han@example.com' }
         }
       ]
     }
@@ -63,20 +65,16 @@ const initializeMockData = () => {
 }
 
 export const projectService = {
-  createProject: async (companyId: string, data: CreateProjectRequest): Promise<Project> => {
-    // 1. Real request to backend
+  createProject: async (companyId: number | string, data: CreateProjectRequest): Promise<Project> => {
     const response = await apiClient.post<{ project: Project }>(`/companies/${companyId}/projects`, data)
     const newProject = response.data.project
 
-    // 2. Sync to local storage for listing
     initializeMockData()
     const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
     projects.unshift(newProject)
     localStorage.setItem(PROJECTS_LOCAL_KEY, JSON.stringify(projects))
 
-    // Initialize mock members for the new project
     const members: Record<string, ProjectMember[]> = JSON.parse(localStorage.getItem(MEMBERS_LOCAL_KEY) || '{}')
-
     let currentUserName = 'Workspace Owner'
     let currentUserEmail = 'owner@workspace.com'
     try {
@@ -87,15 +85,16 @@ export const projectService = {
         currentUserEmail = userObj.email || currentUserEmail
       }
     } catch {
-      // Silently fall back if local storage has malformed JSON
+      // fallback silently
     }
 
     members[newProject.id] = [
       {
-        id: `mem-new-${Date.now()}`,
-        userId: newProject.ownerId || 'usr-current',
+        id: Date.now(),
+        userId: newProject.ownerId || 3,
         projectId: newProject.id,
-        roleId: 'owner',
+        roleId: 1,
+        roleTitle: 'Owner',
         user: { name: currentUserName, email: currentUserEmail }
       }
     ]
@@ -104,83 +103,129 @@ export const projectService = {
     return newProject
   },
 
-  addProjectMember: async (companyId: string, projectId: string, data: AddProjectMemberRequest): Promise<ProjectMember> => {
-    interface MemberResponsePayload {
-      id?: string
-      user?: {
-        name: string
-        email: string
-      }
-    }
-
+  addProjectMember: async (companyId: number | string, projectId: number | string, data: AddProjectMemberRequest): Promise<ProjectMember> => {
     interface AddMemberResponse {
-      data?: MemberResponsePayload
-      member?: MemberResponsePayload
-      id?: string
-      user?: {
-        name: string
-        email: string
+      data?: {
+        id?: number
+        roleTitle?: string
+        user?: { name: string; email: string }
+        name?: string
+        email?: string
       }
+      member?: {
+        id?: number
+        roleTitle?: string
+        user?: { name: string; email: string }
+        name?: string
+        email?: string
+      }
+      id?: number
+      roleTitle?: string
+      user?: { name: string; email: string }
+      name?: string
+      email?: string
     }
 
     const response = await apiClient.post<AddMemberResponse>(
       `/companies/${companyId}/projects/${projectId}/members`,
       data
     )
-
     const newMember = response.data.data || response.data.member || response.data
 
-    // 2. Sync to local storage
     initializeMockData()
     const members: Record<string, ProjectMember[]> = JSON.parse(localStorage.getItem(MEMBERS_LOCAL_KEY) || '{}')
 
-    if (!members[projectId]) {
-      members[projectId] = []
+    const pIdStr = String(projectId)
+    if (!members[pIdStr]) {
+      members[pIdStr] = []
     }
 
     const typedMember: ProjectMember = {
-      id: newMember.id || `mem-${Date.now()}`,
-      userId: data.user_id,
-      projectId: projectId,
-      roleId: data.role_id,
+      id: Number(newMember.id) || Date.now(),
+      userId: Number(data.user_id),
+      projectId: Number(projectId),
+      roleId: Number(data.role_id) || data.role_id,
+      roleTitle: newMember.roleTitle || 'Developer',
       user: newMember.user || {
-        name: `User ${data.user_id.slice(0, 4)}`,
-        email: `user-${data.user_id.slice(0, 4)}@company.com`
+        name: newMember.name || `User ${data.user_id}`,
+        email: newMember.email || `user-${data.user_id}@company.com`
       }
     }
 
-    members[projectId].push(typedMember)
+    members[pIdStr].push(typedMember)
     localStorage.setItem(MEMBERS_LOCAL_KEY, JSON.stringify(members))
 
     return typedMember
   },
 
-  getProjects: async (companyId: string): Promise<Project[]> => {
-    initializeMockData()
-    const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
-    return projects.filter(p => p.companyId === companyId || p.companyId === 'default-comp')
+  getProjects: async (companyId: number | string): Promise<Project[]> => {
+    try {
+      const response = await apiClient.get<{ data: Project[] }>(`/companies/${companyId}/projects`)
+      return response.data.data
+    } catch (err) {
+      console.warn('GET /companies/:id/projects failed, falling back to mock projects list:', err)
+      initializeMockData()
+      const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
+      return projects.filter(p => Number(p.companyId) === Number(companyId) || p.companyId === 1)
+    }
   },
 
-  getProjectById: async (_companyId: string, projectId: string): Promise<Project> => {
+  getProjectById: async (_companyId: number | string, projectId: number | string): Promise<Project> => {
     initializeMockData()
     const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
-    const project = projects.find(p => p.id === projectId)
+    const project = projects.find(p => Number(p.id) === Number(projectId))
     if (!project) {
       throw new Error('Project not found')
     }
     return project
   },
 
-  getProjectMembers: async (_companyId: string, projectId: string): Promise<ProjectMember[]> => {
+  getProjectMembers: async (companyId: number | string, projectId: number | string): Promise<ProjectMember[]> => {
     initializeMockData()
     const members: Record<string, ProjectMember[]> = JSON.parse(localStorage.getItem(MEMBERS_LOCAL_KEY) || '{}')
-    return members[projectId] || []
+    const membersList = members[String(projectId)]
+    if (membersList) return membersList
+
+    // If project member route is missing, fallback to company members list
+    const compMembers = await projectService.getCompanyMembers(companyId)
+    return compMembers.map(m => ({
+      ...m,
+      projectId: Number(projectId)
+    }))
   },
 
-  updateProject: async (_companyId: string, projectId: string, data: Partial<Project>): Promise<Project> => {
+  getCompanyMembers: async (companyId: number | string): Promise<ProjectMember[]> => {
+    interface CompanyMemberPayload {
+      userId: number
+      name: string
+      email: string
+      roleId: number | string
+      roleTitle?: string
+    }
+
+    try {
+      const response = await apiClient.get<{ data: CompanyMemberPayload[] }>(`/companies/${companyId}/members`)
+      return response.data.data.map((m, idx) => ({
+        id: Number(m.userId) || idx,
+        userId: Number(m.userId),
+        projectId: 0,
+        roleId: Number(m.roleId) || m.roleId,
+        roleTitle: m.roleTitle,
+        user: { name: m.name, email: m.email }
+      }))
+    } catch (err) {
+      console.warn('GET /companies/:id/members failed, returning mock members list:', err)
+      return [
+        { id: 3, userId: 3, projectId: 0, roleId: 1, roleTitle: 'Owner', user: { name: 'Han Min', email: 'han@example.com' } },
+        { id: 7, userId: 7, projectId: 0, roleId: 2, roleTitle: 'Developer', user: { name: 'Jane Doe', email: 'jane@doe.com' } }
+      ]
+    }
+  },
+
+  updateProject: async (_companyId: number | string, projectId: number | string, data: Partial<Project>): Promise<Project> => {
     initializeMockData()
     const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
-    const index = projects.findIndex(p => p.id === projectId)
+    const index = projects.findIndex(p => Number(p.id) === Number(projectId))
     if (index === -1) {
       throw new Error('Project not found')
     }
@@ -194,14 +239,14 @@ export const projectService = {
     return projects[index]
   },
 
-  deleteProject: async (_companyId: string, projectId: string): Promise<void> => {
+  deleteProject: async (_companyId: number | string, projectId: number | string): Promise<void> => {
     initializeMockData()
     const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
-    const filteredProjects = projects.filter(p => p.id !== projectId)
+    const filteredProjects = projects.filter(p => Number(p.id) !== Number(projectId))
     localStorage.setItem(PROJECTS_LOCAL_KEY, JSON.stringify(filteredProjects))
 
     const members: Record<string, ProjectMember[]> = JSON.parse(localStorage.getItem(MEMBERS_LOCAL_KEY) || '{}')
-    delete members[projectId]
+    delete members[String(projectId)]
     localStorage.setItem(MEMBERS_LOCAL_KEY, JSON.stringify(members))
   }
 }

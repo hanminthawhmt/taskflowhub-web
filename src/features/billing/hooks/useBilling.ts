@@ -1,15 +1,22 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { billingService } from '../services/billing.service'
 
-export function usePortalMutation(companyId: string) {
+export function usePlansQuery() {
+  return useQuery({
+    queryKey: ['billing', 'plans'],
+    queryFn: () => billingService.getPlans(),
+  })
+}
+
+export function usePortalMutation(companyId: number | string) {
   return useMutation({
     mutationFn: () => billingService.getPortalUrl(companyId),
   })
 }
 
-export function useCheckoutMutation(companyId: string) {
+export function useCheckoutMutation(companyId: number | string) {
   return useMutation({
-    mutationFn: (planId: 'starter' | 'pro' | 'enterprise') =>
+    mutationFn: (planId: number) =>
       billingService.getCheckoutUrl(companyId, planId),
   })
 }

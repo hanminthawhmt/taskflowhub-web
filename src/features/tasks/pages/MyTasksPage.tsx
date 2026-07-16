@@ -8,17 +8,17 @@ import axios from 'axios'
 
 export default function MyTasksPage() {
   const activeCompany = useAuthStore((state) => state.activeCompany)
-  const companyId = activeCompany?.id || 'default-comp'
+  const companyId = activeCompany?.id || 1
 
   const { data: projects, isLoading: projectsLoading } = useCompanyProjects(companyId)
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [selectedProjectId, setSelectedProjectId] = useState<string | number>('')
 
   const activeProjectId = selectedProjectId || (projects && projects.length > 0 ? projects[0].id : '')
 
   const { data: tasks, isLoading: tasksLoading, isError } = useMyTasks(activeProjectId)
   const updateStatusMutation = useUpdateTaskStatusMutation(activeProjectId)
 
-  const handleToggleStatus = async (taskId: string, currentStatus: 'pending' | 'complete') => {
+  const handleToggleStatus = async (taskId: number | string, currentStatus: 'pending' | 'complete') => {
     const nextStatus = currentStatus === 'pending' ? 'complete' : 'pending'
     try {
       await updateStatusMutation.mutateAsync({
@@ -115,10 +115,10 @@ export default function MyTasksPage() {
 
                     {/* Meta info badges */}
                     <div className="flex flex-wrap items-center gap-3 pt-1 text-[10px] text-slate-400">
-                      {task.end_date && (
+                      {(task.endDate || task.startDate) && (
                         <span className="flex items-center gap-1">
                           <Calendar size={12} />
-                          Due: {new Date(task.end_date).toLocaleDateString()}
+                          Due: {new Date(task.endDate || task.startDate || '').toLocaleDateString()}
                         </span>
                       )}
 
