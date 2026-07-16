@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as zod from 'zod'
 import { useAuthStore } from '../../../store/useAuthStore'
 import { useCompanyProjects, useCreateProjectMutation } from '../hooks/useProjects'
-import { Plus, Search, Calendar, Folder, MoreVertical, X } from 'lucide-react'
+import { Plus, Search, Calendar, Folder, MoreVertical, X, Users } from 'lucide-react'
 import axios from 'axios'
 
 const createProjectSchema = zod.object({
@@ -139,15 +139,12 @@ export default function ProjectsPage() {
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-50 dark:border-slate-800 space-y-4">
-                {/* Progress bar mock */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-                    <span>Task Progress</span>
-                    <span>70%</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-blue-600 h-full rounded-full animate-pulse" style={{ width: '70%' }}></div>
-                  </div>
+                {/* Task count from real API (taskCount from GET /companies/:companyId/projects) */}
+                <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                  <span className="font-semibold">Tasks</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-300">
+                    {project.taskCount ?? 0}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-slate-400">
@@ -156,15 +153,11 @@ export default function ProjectsPage() {
                     {new Date(project.createdAt).toLocaleDateString()}
                   </span>
 
-                  {/* Mock avatars */}
-                  <div className="flex -space-x-1.5 overflow-hidden">
-                    <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white dark:ring-slate-900 bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-[10px] font-bold text-blue-600 dark:text-blue-400">
-                      JD
-                    </div>
-                    <div className="inline-block h-6 w-6 rounded-full ring-2 ring-white dark:ring-slate-900 bg-green-100 dark:bg-green-900 flex items-center justify-center text-[10px] font-bold text-green-600 dark:text-green-400">
-                      AS
-                    </div>
-                  </div>
+                  {/* Real member count from API (memberCount from GET /companies/:companyId/projects) */}
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold border border-blue-100/50 dark:border-blue-900/50">
+                    <Users size={10} />
+                    {project.memberCount ?? 0} member{(project.memberCount ?? 0) !== 1 ? 's' : ''}
+                  </span>
                 </div>
               </div>
             </Link>
