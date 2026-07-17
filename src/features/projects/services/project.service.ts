@@ -192,8 +192,18 @@ export const projectService = {
 
   getProjectMembers: async (companyId: number | string, projectId: number | string): Promise<ProjectMember[]> => {
     try {
-      const response = await apiClient.get<{ data: ProjectMember[] }>(`/companies/${companyId}/projects/${projectId}/members`)
-      return response.data.data
+      const response = await apiClient.get<{ data: any[] }>(`/companies/${companyId}/projects/${projectId}/members`)
+      return response.data.data.map((m: any) => ({
+        id: m.id || m.userId,
+        userId: m.userId,
+        projectId: Number(projectId),
+        roleId: m.roleId,
+        roleTitle: m.roleTitle,
+        user: {
+          name: m.name || '',
+          email: m.email || ''
+        }
+      }))
     } catch (err) {
       console.warn('GET /companies/:companyId/projects/:projectId/members failed, falling back to mock:', err)
       initializeMockData()

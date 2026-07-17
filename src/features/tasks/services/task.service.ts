@@ -53,9 +53,18 @@ const initializeMockTasks = (projectId: number | string) => {
 
 export const taskService = {
   createTask: async (projectId: number | string, data: CreateTaskRequest): Promise<Task> => {
-    const response = await apiClient.post<unknown>(`/${projectId}/tasks`, data)
+    const response = await apiClient.post<unknown>(`/projects/${projectId}/tasks`, data)
     const resBody = response.data as Record<string, unknown>
-    const newTask = (resBody?.project || resBody?.task || resBody) as Record<string, unknown>
+    let newTask = resBody
+    if (resBody && typeof resBody === 'object') {
+      if (resBody.project) {
+        newTask = resBody.project as Record<string, unknown>
+      } else if (resBody.task) {
+        newTask = resBody.task as Record<string, unknown>
+      } else if (resBody.data) {
+        newTask = resBody.data as Record<string, unknown>
+      }
+    }
 
     initializeMockTasks(projectId)
     const currentKey = `${TASKS_LOCAL_KEY}_${projectId}`
@@ -84,10 +93,10 @@ export const taskService = {
 
   getMyTasks: async (projectId: number | string): Promise<Task[]> => {
     try {
-      const response = await apiClient.get<{ data: Task[] }>(`/${projectId}/tasks/mine`)
+      const response = await apiClient.get<{ data: Task[] }>(`/projects/${projectId}/mine`)
       return response.data.data || []
     } catch (err) {
-      console.warn('GET /:projectId/tasks/mine failed, returning local storage subset:', err)
+      console.warn('GET /projects/:projectId/mine failed, returning local storage subset:', err)
       initializeMockTasks(projectId)
       const currentKey = `${TASKS_LOCAL_KEY}_${projectId}`
       const tasks: Task[] = JSON.parse(localStorage.getItem(currentKey) || '[]')
@@ -107,7 +116,7 @@ export const taskService = {
 
   updateTaskStatus: async (projectId: number | string, taskId: number | string, data: UpdateTaskStatusRequest): Promise<Task> => {
     const response = await apiClient.patch<unknown>(
-      `/${projectId}/tasks/${taskId}/status`,
+      `/projects/${projectId}/tasks/${taskId}/status`,
       data
     )
     const resBody = response.data as Record<string, unknown>
@@ -131,10 +140,10 @@ export const taskService = {
 
   getProjectTasks: async (projectId: number | string): Promise<Task[]> => {
     try {
-      const response = await apiClient.get<{ data: Task[] }>(`/${projectId}/tasks`)
+      const response = await apiClient.get<{ data: Task[] }>(`/projects/${projectId}/tasks`)
       return response.data.data
     } catch (err) {
-      console.warn('GET /:projectId/tasks failed, falling back to mock tasks list:', err)
+      console.warn('GET /projects/:projectId/tasks failed, falling back to mock tasks list:', err)
       initializeMockTasks(projectId)
       const currentKey = `${TASKS_LOCAL_KEY}_${projectId}`
       return JSON.parse(localStorage.getItem(currentKey) || '[]')
