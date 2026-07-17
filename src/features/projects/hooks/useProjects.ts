@@ -54,3 +54,15 @@ export function useAddProjectMemberMutation(companyId: number | string, projectI
     },
   })
 }
+
+export function useDeleteProjectMutation(companyId: number | string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (projectId: number | string) =>
+      projectService.deleteProject(companyId, projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects', companyId] })
+    },
+  })
+}
+

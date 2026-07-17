@@ -4,9 +4,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as zod from 'zod'
 import { useAuthStore } from '../../../store/useAuthStore'
-import { useCompanyProjects, useCreateProjectMutation } from '../hooks/useProjects'
-import { Plus, Search, Calendar, Folder, MoreVertical, X, Users } from 'lucide-react'
+import { useCompanyProjects, useCreateProjectMutation, useDeleteProjectMutation } from '../hooks/useProjects'
+import { Plus, Search, Calendar, Folder, Trash2, X, Users } from 'lucide-react'
 import axios from 'axios'
+import { toast } from 'sonner'
 
 const createProjectSchema = zod.object({
   title: zod.string().min(1, 'Project title is required').max(100, 'Title is too long'),
@@ -21,6 +22,21 @@ export default function ProjectsPage() {
 
   const { data: projects, isLoading, isError, refetch } = useCompanyProjects(companyId)
   const createMutation = useCreateProjectMutation(companyId)
+  const deleteMutation = useDeleteProjectMutation(companyId)
+
+  const handleDeleteProject = async (e: React.MouseEvent, projectId: number | string, title: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (window.confirm(`Are you sure you want to permanently delete project "${title}"? This will also delete all of its tasks, members, and details. This action cannot be undone.`)) {
+      try {
+        await deleteMutation.mutateAsync(projectId)
+        toast.success(`Project "${title}" deleted successfully`)
+      } catch (err: any) {
+        toast.error(err.response?.data?.message || 'Failed to delete project')
+      }
+    }
+  }
 
   const [searchQuery, setSearchQuery] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
@@ -129,8 +145,12 @@ export default function ProjectsPage() {
                   <h3 className="font-bold text-lg text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {project.title}
                   </h3>
-                  <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                    <MoreVertical size={16} />
+                  <button 
+                    onClick={(e) => handleDeleteProject(e, project.id, project.title)}
+                    className="text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                    title="Delete Project"
+                  >
+                    <Trash2 size={16} />
                   </button>
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
