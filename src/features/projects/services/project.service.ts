@@ -66,8 +66,13 @@ const initializeMockData = () => {
 
 export const projectService = {
   createProject: async (companyId: number | string, data: CreateProjectRequest): Promise<Project> => {
-    const response = await apiClient.post<{ project: Project }>(`/companies/${companyId}/projects`, data)
-    const newProject = response.data.project
+    const response = await apiClient.post<any>(`/companies/${companyId}/projects`, data)
+    const resData = response.data
+    const newProject = resData?.data || resData?.project || resData
+
+    if (!newProject || typeof newProject !== 'object') {
+      throw new Error('Invalid project response from server')
+    }
 
     initializeMockData()
     const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
