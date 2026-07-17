@@ -7,6 +7,7 @@ interface AuthState {
   activeCompany: Company | null
   isAuthenticated: boolean
   setAuth: (user: User, token: string, company?: Company) => void
+  setUser: (user: User) => void
   clearAuth: () => void
   setActiveCompany: (company: Company) => void
 }
@@ -61,5 +62,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   setActiveCompany: (company) => {
     localStorage.setItem('activeCompany', JSON.stringify(company))
     set({ activeCompany: company })
+  },
+  setUser: (user) => {
+    localStorage.setItem('user', JSON.stringify(user))
+    set({ user })
   },
 }))

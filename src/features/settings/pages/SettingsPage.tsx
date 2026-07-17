@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as zod from 'zod'
@@ -48,6 +48,16 @@ export default function SettingsPage() {
     },
   })
 
+  // Sync profile form defaults when user store loads/updates
+  useEffect(() => {
+    if (user) {
+      profileForm.reset({
+        name: user.name,
+        email: user.email,
+      })
+    }
+  }, [user, profileForm])
+
   const passwordForm = useForm<PasswordInputs>({
     resolver: zodResolver(passwordSchema),
     defaultValues: {
@@ -63,6 +73,15 @@ export default function SettingsPage() {
       companyName: activeCompany?.name || '',
     },
   })
+
+  // Sync workspace form defaults when activeCompany store loads/updates
+  useEffect(() => {
+    if (activeCompany) {
+      workspaceForm.reset({
+        companyName: activeCompany.name,
+      })
+    }
+  }, [activeCompany, workspaceForm])
 
   // Submit Handlers
   const onProfileSubmit = async (data: ProfileInputs) => {

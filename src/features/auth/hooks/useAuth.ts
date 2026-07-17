@@ -11,6 +11,14 @@ export function useCompaniesQuery() {
   })
 }
 
+export function useProfileQuery(enabled = true) {
+  return useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => authService.getMe(),
+    enabled,
+  })
+}
+
 interface NestedUserResponse {
   id: string
   name: string

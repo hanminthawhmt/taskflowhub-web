@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router'
 import { useAuthStore } from '../store/useAuthStore'
 import { useUiStore } from '../store/useUiStore'
-import { useCompaniesQuery } from '../features/auth/hooks/useAuth'
+import { useCompaniesQuery, useProfileQuery } from '../features/auth/hooks/useAuth'
 import {
   LayoutDashboard,
   FolderKanban,
@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 
 export default function DashboardLayout() {
-  const { user, activeCompany, clearAuth, setActiveCompany } = useAuthStore()
+  const { user, activeCompany, clearAuth, setActiveCompany, setUser } = useAuthStore()
   const { sidebarOpen, theme, toggleSidebar, toggleTheme } = useUiStore()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false)
@@ -32,6 +32,14 @@ export default function DashboardLayout() {
   const location = useLocation()
 
   const { data: apiCompanies } = useCompaniesQuery()
+  const { data: profile } = useProfileQuery(!!localStorage.getItem('token'))
+
+  // Sync profile data with state store
+  useEffect(() => {
+    if (profile) {
+      setUser(profile)
+    }
+  }, [profile, setUser])
 
   // Auto-initialize active company context if not set yet
   useEffect(() => {
