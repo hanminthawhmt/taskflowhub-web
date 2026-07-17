@@ -321,7 +321,7 @@ This document lists the recommended API endpoints currently missing from the bac
 ---
 
 ### [STATUS: NEEDED] Tasks With Upcoming Deadlines
-- Suggested method + path: `GET /companies/:companyId/tasks/upcoming`
+- Suggested method + path: `GET /projects/companies/:companyId/tasks/upcoming`
 - Why the frontend needs it: `DashboardPage.tsx` (lines 37–41) renders an "Upcoming Deadlines" panel with 3 completely hardcoded task items, fake project names, and fake relative due dates. No existing endpoint returns tasks sorted/filtered by upcoming `end_date` across all projects in a company.
 - Expected request body / params: `GET` (optional `?days=7` for lookahead window)
 - Expected response shape:
