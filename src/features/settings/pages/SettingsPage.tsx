@@ -100,12 +100,21 @@ export default function SettingsPage() {
     }
   }
 
-  const onWorkspaceSubmit = (data: WorkspaceInputs) => {
+  const onWorkspaceSubmit = async (data: WorkspaceInputs) => {
     if (activeCompany) {
-      const updatedCompany = { ...activeCompany, name: data.companyName }
-      localStorage.setItem('activeCompany', JSON.stringify(updatedCompany))
-      setActiveCompany(updatedCompany)
-      toast.success('Workspace settings updated successfully (Mock Synced)')
+      try {
+        const response = await authService.updateCompany(activeCompany.id, data.companyName)
+        const updatedCompany = { ...activeCompany, name: response.data.name }
+        localStorage.setItem('activeCompany', JSON.stringify(updatedCompany))
+        setActiveCompany(updatedCompany)
+        toast.success('Workspace settings updated successfully!')
+      } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+          toast.error(err.response?.data?.message || 'Failed to update workspace settings.')
+        } else {
+          toast.error('An unexpected error occurred.')
+        }
+      }
     }
   }
 

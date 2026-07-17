@@ -26,4 +26,9 @@ export const authService = {
     const response = await apiClient.get<{ data: Company[] }>('/companies')
     return response.data.data
   },
+
+  updateCompany: async (companyId: number | string, name: string): Promise<{ message: string; data: Company }> => {
+    const response = await apiClient.patch<{ message: string; data: Company }>(`/companies/${companyId}`, { name })
+    return response.data
+  },
 }

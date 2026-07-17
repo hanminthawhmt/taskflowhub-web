@@ -170,7 +170,17 @@ export const projectService = {
     }
   },
 
-  getProjectById: async (_companyId: number | string, projectId: number | string): Promise<Project> => {
+  getProjectById: async (companyId: number | string, projectId: number | string): Promise<Project> => {
+    try {
+      const projects = await projectService.getProjects(companyId)
+      const project = projects.find(p => Number(p.id) === Number(projectId))
+      if (project) {
+        return project
+      }
+    } catch (err) {
+      console.warn('Failed to find project in live company list, falling back to mock:', err)
+    }
+
     initializeMockData()
     const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
     const project = projects.find(p => Number(p.id) === Number(projectId))
@@ -181,17 +191,23 @@ export const projectService = {
   },
 
   getProjectMembers: async (companyId: number | string, projectId: number | string): Promise<ProjectMember[]> => {
-    initializeMockData()
-    const members: Record<string, ProjectMember[]> = JSON.parse(localStorage.getItem(MEMBERS_LOCAL_KEY) || '{}')
-    const membersList = members[String(projectId)]
-    if (membersList) return membersList
+    try {
+      const response = await apiClient.get<{ data: ProjectMember[] }>(`/companies/${companyId}/projects/${projectId}/members`)
+      return response.data.data
+    } catch (err) {
+      console.warn('GET /companies/:companyId/projects/:projectId/members failed, falling back to mock:', err)
+      initializeMockData()
+      const members: Record<string, ProjectMember[]> = JSON.parse(localStorage.getItem(MEMBERS_LOCAL_KEY) || '{}')
+      const membersList = members[String(projectId)]
+      if (membersList) return membersList
 
-    // If project member route is missing, fallback to company members list
-    const compMembers = await projectService.getCompanyMembers(companyId)
-    return compMembers.map(m => ({
-      ...m,
-      projectId: Number(projectId)
-    }))
+      // If project member route is missing, fallback to company members list
+      const compMembers = await projectService.getCompanyMembers(companyId)
+      return compMembers.map(m => ({
+        ...m,
+        projectId: Number(projectId)
+      }))
+    }
   },
 
   getCompanyMembers: async (companyId: number | string): Promise<ProjectMember[]> => {
@@ -222,24 +238,50 @@ export const projectService = {
     }
   },
 
-  updateProject: async (_companyId: number | string, projectId: number | string, data: Partial<Project>): Promise<Project> => {
-    initializeMockData()
-    const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
-    const index = projects.findIndex(p => Number(p.id) === Number(projectId))
-    if (index === -1) {
-      throw new Error('Project not found')
-    }
+  updateProject: async (companyId: number | string, projectId: number | string, data: Partial<Project>): Promise<Project> => {
+    try {
+      const response = await apiClient.patch<{ message: string; data: Project }>(`/companies/${companyId}/projects/${projectId}`, data)
+      const updatedProject = response.data.data
 
-    projects[index] = {
-      ...projects[index],
-      ...data,
-      updatedAt: new Date().toISOString()
+      // Keep mock in sync
+      initializeMockData()
+      const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
+      const index = projects.findIndex(p => Number(p.id) === Number(projectId))
+      if (index !== -1) {
+        projects[index] = {
+          ...projects[index],
+          ...updatedProject,
+          updatedAt: new Date().toISOString()
+        }
+        localStorage.setItem(PROJECTS_LOCAL_KEY, JSON.stringify(projects))
+      }
+      return updatedProject
+    } catch (err) {
+      console.warn('PATCH /companies/:companyId/projects/:projectId failed, updating mock:', err)
+      initializeMockData()
+      const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
+      const index = projects.findIndex(p => Number(p.id) === Number(projectId))
+      if (index === -1) {
+        throw new Error('Project not found', { cause: err })
+      }
+
+      projects[index] = {
+        ...projects[index],
+        ...data,
+        updatedAt: new Date().toISOString()
+      }
+      localStorage.setItem(PROJECTS_LOCAL_KEY, JSON.stringify(projects))
+      return projects[index]
     }
-    localStorage.setItem(PROJECTS_LOCAL_KEY, JSON.stringify(projects))
-    return projects[index]
   },
 
-  deleteProject: async (_companyId: number | string, projectId: number | string): Promise<void> => {
+  deleteProject: async (companyId: number | string, projectId: number | string): Promise<void> => {
+    try {
+      await apiClient.delete(`/companies/${companyId}/projects/${projectId}`)
+    } catch (err) {
+      console.warn('DELETE /companies/:companyId/projects/:projectId failed, deleting locally:', err)
+    }
+
     initializeMockData()
     const projects: Project[] = JSON.parse(localStorage.getItem(PROJECTS_LOCAL_KEY) || '[]')
     const filteredProjects = projects.filter(p => Number(p.id) !== Number(projectId))
