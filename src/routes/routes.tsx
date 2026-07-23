@@ -11,6 +11,8 @@ import MyTasksPage from '../features/tasks/pages/MyTasksPage'
 import BillingPage from '../features/billing/pages/BillingPage'
 import SettingsPage from '../features/settings/pages/SettingsPage'
 import NotFoundPage from '../pages/NotFoundPage'
+import InvitationPage from '../features/invitations/pages/InvitationPage'
+import MembersPage from '../features/members/pages/MembersPage'
 
 export const router = createBrowserRouter([
   {
@@ -54,6 +56,10 @@ export const router = createBrowserRouter([
             element: <MyTasksPage />,
           },
           {
+            path: 'members',
+            element: <MembersPage />,
+          },
+          {
             path: 'billing',
             element: <BillingPage />,
           },
@@ -64,6 +70,11 @@ export const router = createBrowserRouter([
         ],
       },
     ],
+  },
+  // Public invitation acceptance route — no auth wrapper
+  {
+    path: 'invitations/:token',
+    element: <InvitationPage />,
   },
   {
     path: '*',

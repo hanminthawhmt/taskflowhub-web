@@ -18,6 +18,7 @@ import {
   LogOut,
   Building,
   User,
+  Users,
   ChevronDown
 } from 'lucide-react'
 
@@ -76,13 +77,22 @@ export default function DashboardLayout() {
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Projects', path: '/dashboard/projects', icon: FolderKanban },
     { name: 'My Tasks', path: '/dashboard/tasks', icon: CheckSquare },
+    { name: 'Members', path: '/dashboard/members', icon: Users },
     { name: 'Billing', path: '/dashboard/billing', icon: CreditCard },
     { name: 'Settings', path: '/dashboard/settings', icon: Settings },
   ]
 
-  // Get active page name for breadcrumb
-  const currentNavItem = navItems.find(item => location.pathname.startsWith(item.path))
+  // Get active page name for breadcrumb — check longer paths first to avoid
+  // /dashboard matching everything that starts with it
+  const currentNavItem = [...navItems]
+    .sort((a, b) => b.path.length - a.path.length)
+    .find((item) =>
+      item.path === '/dashboard'
+        ? location.pathname === '/dashboard'
+        : location.pathname.startsWith(item.path)
+    )
   const pageTitle = currentNavItem ? currentNavItem.name : 'TaskSaaS'
+
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 font-sans">
