@@ -5,9 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as zod from 'zod'
 import { useAuthStore } from '../../../store/useAuthStore'
 import { useCompanyProjects, useCreateProjectMutation, useDeleteProjectMutation } from '../hooks/useProjects'
-import { Plus, Search, Calendar, Folder, Trash2, X, Users } from 'lucide-react'
+import { Plus, Search, Calendar, Folder, Trash2, X, Users, Download } from 'lucide-react'
 import axios from 'axios'
 import { toast } from 'sonner'
+import { exportToCSV } from '../../../utils/csvExport'
 
 const createProjectSchema = zod.object({
   title: zod.string().min(1, 'Project title is required').max(100, 'Title is too long'),
@@ -85,13 +86,37 @@ export default function ProjectsPage() {
             Manage and monitor progress across your workspace projects.
           </p>
         </div>
-        <button
-          onClick={() => { setErrorMsg(null); setModalOpen(true) }}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg cursor-pointer shadow-sm shadow-blue-500/10"
-        >
-          <Plus size={16} />
-          <span>New Project</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              if (!projects || projects.length === 0) return
+              exportToCSV(
+                projects.map((p) => ({
+                  ID: p.id,
+                  Title: p.title,
+                  Description: p.description || '',
+                  MemberCount: p.memberCount || 0,
+                  TaskCount: p.taskCount || 0,
+                  CreatedAt: new Date(p.createdAt).toLocaleDateString(),
+                })),
+                `${activeCompany?.name || 'Workspace'}_Projects`
+              )
+              toast.success('Projects exported to CSV')
+            }}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors rounded-lg cursor-pointer"
+          >
+            <Download size={15} />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            onClick={() => { setErrorMsg(null); setModalOpen(true) }}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg cursor-pointer shadow-sm shadow-blue-500/10"
+          >
+            <Plus size={16} />
+            <span>New Project</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Filter bar */}

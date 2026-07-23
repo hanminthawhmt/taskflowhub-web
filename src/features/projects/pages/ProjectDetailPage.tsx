@@ -19,10 +19,16 @@ import {
   Plus,
   AlertCircle,
   CheckCircle2,
-  Circle
+  Circle,
+  LayoutGrid,
+  List,
+  Download,
+  Filter,
+  GripVertical
 } from 'lucide-react'
 import axios from 'axios'
 import { toast } from 'sonner'
+import { exportToCSV } from '../../../utils/csvExport'
 
 // Validation schemas
 const addMemberSchema = zod.object({
@@ -65,6 +71,9 @@ export default function ProjectDetailPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [taskErrorMsg, setTaskErrorMsg] = useState<string | null>(null)
   const [taskSearchQuery, setTaskSearchQuery] = useState('')
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all')
+  const [taskViewMode, setTaskViewMode] = useState<'board' | 'list' | 'calendar'>('board')
+  const [dragOverColumn, setDragOverColumn] = useState<'pending' | 'complete' | null>(null)
 
   // Member form
   const addMemberForm = useForm<AddMemberInputs>({
@@ -171,13 +180,39 @@ export default function ProjectDetailPage() {
     )
   }
 
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, taskId: number) => {
+    e.dataTransfer.setData('text/plain', String(taskId))
+  }
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: 'pending' | 'complete') => {
+    e.preventDefault()
+    setDragOverColumn(null)
+    const taskIdStr = e.dataTransfer.getData('text/plain')
+    if (!taskIdStr) return
+
+    const taskId = Number(taskIdStr)
+    const task = tasks?.find((t) => Number(t.id) === taskId)
+    if (task && task.status !== targetStatus) {
+      try {
+        await updateTaskStatusMutation.mutateAsync({ taskId, data: { status: targetStatus } })
+        toast.success(`Task moved to ${targetStatus === 'complete' ? 'Completed' : 'Pending'}`)
+      } catch {
+        toast.error('Failed to update task status')
+      }
+    }
+  }
+
   // Filter and split tasks
-  const filteredTasks = tasks?.filter(t => 
-    t.title.toLowerCase().includes(taskSearchQuery.toLowerCase())
-  ) || []
-  
-  const pendingTasks = filteredTasks.filter(t => t.status === 'pending')
-  const completedTasks = filteredTasks.filter(t => t.status === 'complete')
+  const filteredTasks = (tasks || []).filter((t) => {
+    const matchesSearch = t.title.toLowerCase().includes(taskSearchQuery.toLowerCase()) ||
+      (t.description && t.description.toLowerCase().includes(taskSearchQuery.toLowerCase()))
+    const matchesPriority = taskPriorityFilter === 'all' || t.priority === taskPriorityFilter
+    return matchesSearch && matchesPriority
+  })
+
+  const pendingTasks = filteredTasks.filter((t) => t.status === 'pending')
+  const completedTasks = filteredTasks.filter((t) => t.status === 'complete')
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -377,25 +412,95 @@ export default function ProjectDetailPage() {
         {/* KANBAN TASKS PANEL */}
         {activeTab === 'tasks' && (
           <div className="space-y-6 animate-fade-in">
-            {/* Header Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 w-full sm:w-80">
-                <Calendar size={16} className="text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search project tasks..."
-                  value={taskSearchQuery}
-                  onChange={(e) => setTaskSearchQuery(e.target.value)}
-                  className="bg-transparent border-0 outline-none text-xs w-full focus:ring-0 dark:text-white"
-                />
+            {/* Header Actions & View Switcher */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Search */}
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 w-full sm:w-64">
+                  <Calendar size={15} className="text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search tasks..."
+                    value={taskSearchQuery}
+                    onChange={(e) => setTaskSearchQuery(e.target.value)}
+                    className="bg-transparent border-0 outline-none text-xs w-full focus:ring-0 dark:text-white"
+                  />
+                </div>
+
+                {/* Priority filter */}
+                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-300">
+                  <Filter size={13} className="text-slate-400" />
+                  <select
+                    value={taskPriorityFilter}
+                    onChange={(e) => setTaskPriorityFilter(e.target.value as 'all' | 'high' | 'medium' | 'low')}
+                    className="bg-transparent border-none outline-none cursor-pointer focus:ring-0 text-xs dark:text-white"
+                  >
+                    <option value="all" className="dark:bg-slate-900">All Priorities</option>
+                    <option value="high" className="dark:bg-slate-900">High Priority</option>
+                    <option value="medium" className="dark:bg-slate-900">Medium Priority</option>
+                    <option value="low" className="dark:bg-slate-900">Low Priority</option>
+                  </select>
+                </div>
+
+                {/* View switcher tabs */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200/60 dark:border-slate-700">
+                  <button
+                    onClick={() => setTaskViewMode('board')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                      taskViewMode === 'board'
+                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs font-semibold'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <LayoutGrid size={13} />
+                    <span>Board</span>
+                  </button>
+                  <button
+                    onClick={() => setTaskViewMode('list')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                      taskViewMode === 'list'
+                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs font-semibold'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <List size={13} />
+                    <span>List</span>
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => { setTaskErrorMsg(null); setTaskModalOpen(true) }}
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg cursor-pointer shadow-sm shadow-blue-500/10"
-              >
-                <Plus size={16} />
-                <span>Add Task</span>
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (!filteredTasks || filteredTasks.length === 0) return
+                    exportToCSV(
+                      filteredTasks.map((t) => ({
+                        TaskID: t.id,
+                        Title: t.title,
+                        Status: t.status,
+                        Priority: t.priority,
+                        Assignee: t.assignee?.name || '',
+                        StartDate: t.startDate || '',
+                        EndDate: t.endDate || '',
+                      })),
+                      `${project.title}_Tasks`
+                    )
+                    toast.success('Tasks exported to CSV')
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors rounded-lg cursor-pointer"
+                >
+                  <Download size={14} />
+                  <span>Export CSV</span>
+                </button>
+
+                <button
+                  onClick={() => { setTaskErrorMsg(null); setTaskModalOpen(true) }}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg cursor-pointer shadow-sm shadow-blue-500/10"
+                >
+                  <Plus size={16} />
+                  <span>Add Task</span>
+                </button>
+              </div>
             </div>
 
             {tasksLoading ? (
@@ -414,14 +519,29 @@ export default function ProjectDetailPage() {
                   Retry
                 </button>
               </div>
-            ) : (
-              /* Two Column Kanban Board */
+            ) : taskViewMode === 'board' ? (
+              /* Two Column Drag-and-Drop Kanban Board */
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {/* 1. Pending Column */}
-                <div className="bg-slate-100/50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/80 space-y-4 min-h-[350px]">
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setDragOverColumn('pending')
+                  }}
+                  onDragLeave={() => setDragOverColumn(null)}
+                  onDrop={(e) => handleDrop(e, 'pending')}
+                  className={`p-4 rounded-xl border transition-all duration-200 space-y-4 min-h-[380px] ${
+                    dragOverColumn === 'pending'
+                      ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-400 dark:border-blue-600 ring-2 ring-blue-500/20'
+                      : 'bg-slate-100/50 dark:bg-slate-900/40 border-slate-200/50 dark:border-slate-800/80'
+                  }`}
+                >
                   <div className="flex items-center justify-between px-2">
-                    <span className="font-bold text-sm text-slate-700 dark:text-slate-300">Pending Tasks</span>
+                    <span className="font-bold text-sm text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                      <span>Pending Tasks</span>
+                      <span className="text-[10px] text-slate-400 font-normal">(Drag to reorder)</span>
+                    </span>
                     <span className="px-2 py-0.5 text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full">
                       {pendingTasks.length}
                     </span>
@@ -434,18 +554,21 @@ export default function ProjectDetailPage() {
                         const assigneeName = assigneeUser?.name || ''
                         return (
                           <div 
-                            key={task.id} 
-                            className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-3 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+                            key={task.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, Number(task.id))}
+                            className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-3 hover:border-slate-300 dark:hover:border-slate-700 transition-all cursor-grab active:cursor-grabbing hover:shadow-md group"
                           >
                             <div className="flex items-start gap-3">
+                              <GripVertical size={16} className="text-slate-300 dark:text-slate-700 group-hover:text-slate-400 shrink-0 mt-0.5" />
                               <button
                                 onClick={() => handleToggleTaskStatus(task.id, task.status)}
                                 disabled={updateTaskStatusMutation.isPending}
-                                className="mt-0.5 text-slate-400 hover:text-blue-600 cursor-pointer"
+                                className="mt-0.5 text-slate-400 hover:text-blue-600 cursor-pointer shrink-0"
                               >
                                 <Circle size={18} />
                               </button>
-                              <div className="space-y-1">
+                              <div className="space-y-1 flex-1">
                                 <h4 className="font-semibold text-sm text-slate-900 dark:text-white leading-tight">
                                   {task.title}
                                 </h4>
@@ -495,37 +618,60 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
-                {/* 2. Complete Column */}
-                <div className="bg-slate-100/50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-200/50 dark:border-slate-800/80 space-y-4 min-h-[350px]">
+                {/* 2. Completed Column */}
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    setDragOverColumn('complete')
+                  }}
+                  onDragLeave={() => setDragOverColumn(null)}
+                  onDrop={(e) => handleDrop(e, 'complete')}
+                  className={`p-4 rounded-xl border transition-all duration-200 space-y-4 min-h-[380px] ${
+                    dragOverColumn === 'complete'
+                      ? 'bg-green-50/70 dark:bg-green-950/40 border-green-400 dark:border-green-600 ring-2 ring-green-500/20'
+                      : 'bg-slate-100/50 dark:bg-slate-900/40 border-slate-200/50 dark:border-slate-800/80'
+                  }`}
+                >
                   <div className="flex items-center justify-between px-2">
-                    <span className="font-bold text-sm text-slate-700 dark:text-slate-300">Completed Tasks</span>
-                    <span className="px-2 py-0.5 text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-full">
+                    <span className="font-bold text-sm text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                      <span>Completed Tasks</span>
+                      <span className="text-[10px] text-slate-400 font-normal">(Drag here to complete)</span>
+                    </span>
+                    <span className="px-2 py-0.5 text-xs font-bold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 rounded-full">
                       {completedTasks.length}
                     </span>
                   </div>
 
                   <div className="space-y-3">
                     {completedTasks.length > 0 ? (
-                      completedTasks.map(task => {
-                        const assigneeUser = task.assignee || members?.find(m => Number(m.userId) === Number(task.user_id))?.user
+                      completedTasks.map((task) => {
+                        const assigneeUser = task.assignee || members?.find((m) => Number(m.userId) === Number(task.user_id))?.user
                         const assigneeName = assigneeUser?.name || ''
                         return (
-                          <div 
-                            key={task.id} 
-                            className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-3 opacity-75"
+                          <div
+                            key={task.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, Number(task.id))}
+                            className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-3 hover:border-slate-300 dark:hover:border-slate-700 transition-all cursor-grab active:cursor-grabbing hover:shadow-md group opacity-75"
                           >
                             <div className="flex items-start gap-3">
+                              <GripVertical size={16} className="text-slate-300 dark:text-slate-700 group-hover:text-slate-400 shrink-0 mt-0.5" />
                               <button
                                 onClick={() => handleToggleTaskStatus(task.id, task.status)}
                                 disabled={updateTaskStatusMutation.isPending}
-                                className="mt-0.5 text-green-500 hover:text-slate-400 cursor-pointer"
+                                className="mt-0.5 text-green-500 hover:text-slate-400 cursor-pointer shrink-0"
                               >
-                                <CheckCircle2 size={18} className="fill-green-50 dark:fill-green-950/20" />
+                                <CheckCircle2 size={18} />
                               </button>
-                              <div className="space-y-1">
-                                <h4 className="font-semibold text-sm text-slate-400 dark:text-slate-500 line-through leading-tight">
+                              <div className="space-y-1 flex-1">
+                                <h4 className="font-semibold text-sm text-slate-900 dark:text-white leading-tight line-through">
                                   {task.title}
                                 </h4>
+                                {task.description && (
+                                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                                    {task.description}
+                                  </p>
+                                )}
                               </div>
                             </div>
 
@@ -550,6 +696,82 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
 
+              </div>
+            ) : (
+              /* List View Mode */
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      <th className="py-3 px-4">Task Title</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Priority</th>
+                      <th className="py-3 px-4">Assignee</th>
+                      <th className="py-3 px-4 text-right">Dates</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                    {filteredTasks.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">
+                          No tasks match the selected filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredTasks.map((t) => {
+                        const assigneeUser = t.assignee || members?.find(m => Number(m.userId) === Number(t.user_id))?.user
+                        const assigneeName = assigneeUser?.name || 'Unassigned'
+                        return (
+                          <tr key={t.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleToggleTaskStatus(t.id, t.status)}
+                                  className="text-slate-400 hover:text-blue-600 cursor-pointer"
+                                >
+                                  {t.status === 'complete' ? (
+                                    <CheckCircle2 size={16} className="text-green-500" />
+                                  ) : (
+                                    <Circle size={16} />
+                                  )}
+                                </button>
+                                <span className={t.status === 'complete' ? 'line-through text-slate-400' : ''}>
+                                  {t.title}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${
+                                t.status === 'complete'
+                                  ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-400'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                              }`}>
+                                {t.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${
+                                t.priority === 'high'
+                                  ? 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-900/50'
+                                  : t.priority === 'medium'
+                                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50'
+                                  : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                              }`}>
+                                {t.priority}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400">
+                              {assigneeName}
+                            </td>
+                            <td className="py-3.5 px-4 text-right text-slate-400">
+                              {t.endDate ? new Date(t.endDate).toLocaleDateString() : 'No deadline'}
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

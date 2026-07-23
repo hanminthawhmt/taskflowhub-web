@@ -15,12 +15,16 @@ import {
   AlertCircle,
   RefreshCw,
   Crown,
+  HelpCircle,
+  Download,
+  Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import axios from 'axios'
 import { useAuthStore } from '../../../store/useAuthStore'
 import { useCompanyMembersQuery, useInviteMemberMutation } from '../hooks/useMembers'
 import type { CompanyMember } from '../services/company-member.service'
+import { exportToCSV } from '../../../utils/csvExport'
 
 // ─── Seeded company role IDs (scope: "company") ──────────────────────────────
 // 1=Owner, 2=Admin, 3=Manager, 4=Member, 5=Guest
@@ -97,6 +101,7 @@ export default function MembersPage() {
 
   const [searchQuery, setSearchQuery] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
+  const [rolesGuideOpen, setRolesGuideOpen] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
 
   const {
@@ -213,14 +218,44 @@ export default function MembersPage() {
           </p>
         </div>
 
-        <button
-          id="invite-member-btn"
-          onClick={() => setModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm shadow-blue-500/20 cursor-pointer shrink-0"
-        >
-          <UserPlus size={16} />
-          Invite Member
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => {
+              if (!members || members.length === 0) return
+              exportToCSV(
+                members.map((m) => ({
+                  Name: m.name,
+                  Email: m.email,
+                  Role: m.roleTitle,
+                  JoinedAt: new Date(m.joinedAt).toLocaleDateString(),
+                })),
+                `${activeCompany?.name || 'Workspace'}_Members`
+              )
+              toast.success('Members list exported to CSV')
+            }}
+            className="flex items-center gap-2 px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+          >
+            <Download size={15} />
+            Export CSV
+          </button>
+
+          <button
+            onClick={() => setRolesGuideOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+          >
+            <HelpCircle size={15} />
+            Roles Guide
+          </button>
+
+          <button
+            id="invite-member-btn"
+            onClick={() => setModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm shadow-blue-500/20 cursor-pointer shrink-0"
+          >
+            <UserPlus size={16} />
+            Invite Member
+          </button>
+        </div>
       </div>
 
       {/* Stats row */}
@@ -485,6 +520,79 @@ export default function MembersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ─── Roles & Permissions Guide Modal ─────────────────────────────────── */}
+      {rolesGuideOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <Shield className="text-blue-600 dark:text-blue-400" size={20} />
+                <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                  Workspace Roles & Permissions
+                </h3>
+              </div>
+              <button
+                onClick={() => setRolesGuideOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
+              {[
+                {
+                  role: 'Owner',
+                  badge: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400',
+                  desc: 'Full workspace ownership. Can manage billing subscriptions, project settings, invite & remove members, and promote admins.',
+                  permissions: ['Manage Billing & Stripe', 'Create & Delete Projects', 'Invite Workspace Members', 'Edit Workspace Settings'],
+                },
+                {
+                  role: 'Admin',
+                  badge: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400',
+                  desc: 'Administrative access across workspace projects and members, excluding core Stripe billing ownership.',
+                  permissions: ['Create & Edit Projects', 'Invite Workspace Members', 'Manage Project Members', 'View Workspace Analytics'],
+                },
+                {
+                  role: 'Manager',
+                  badge: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400',
+                  desc: 'Project leadership role. Can create projects, add existing team members, and assign task priorities.',
+                  permissions: ['Create Projects', 'Add Project Members', 'Assign Tasks & Priorities', 'View Activity Logs'],
+                },
+                {
+                  role: 'Member',
+                  badge: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300',
+                  desc: 'Standard team collaborator. Can create, track, and update task statuses across assigned projects.',
+                  permissions: ['Create Tasks', 'Update Task Statuses', 'Comment & Track Assigned Tasks'],
+                },
+                {
+                  role: 'Guest',
+                  badge: 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-900 dark:text-gray-400',
+                  desc: 'Limited access collaborator restricted to assigned project boards only.',
+                  permissions: ['View Assigned Tasks', 'Update Task Statuses'],
+                },
+              ].map((r) => (
+                <div key={r.role} className="p-4 bg-slate-50 dark:bg-slate-850 border border-slate-100 dark:border-slate-800 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full border ${r.badge}`}>
+                      {r.role}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">{r.desc}</p>
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                    {r.permissions.map((p) => (
+                      <div key={p} className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                        <Check size={12} className="text-green-500 shrink-0" />
+                        <span>{p}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

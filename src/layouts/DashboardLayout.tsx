@@ -19,8 +19,10 @@ import {
   Building,
   User,
   Users,
-  ChevronDown
+  ChevronDown,
+  Search
 } from 'lucide-react'
+import CommandPalette from '../components/common/CommandPalette'
 
 export default function DashboardLayout() {
   const { user, activeCompany, clearAuth, setActiveCompany, setUser } = useAuthStore()
@@ -28,6 +30,19 @@ export default function DashboardLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false)
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
+
+  // Listen for Cmd+K or Ctrl+K keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCommandPaletteOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const navigate = useNavigate()
   const location = useLocation()
@@ -305,6 +320,18 @@ export default function DashboardLayout() {
             </h1>
           </div>
 
+          {/* Center section: Command Palette Trigger Button */}
+          <button
+            onClick={() => setCommandPaletteOpen(true)}
+            className="hidden sm:flex items-center gap-3 px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700/60 rounded-xl text-xs text-slate-500 dark:text-slate-400 transition-colors cursor-pointer"
+          >
+            <Search size={14} className="text-slate-400" />
+            <span className="font-medium">Search commands or projects...</span>
+            <kbd className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded shadow-xs ml-2">
+              ⌘K
+            </kbd>
+          </button>
+
           {/* Right section: Profile Dropdown */}
           {user && (
             <div className="relative">
@@ -370,6 +397,12 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Global Command Palette */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
 
     </div>
   )
