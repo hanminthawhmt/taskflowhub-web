@@ -29,5 +29,5 @@ export interface CreateProjectRequest {
 
 export interface AddProjectMemberRequest {
   user_id: number | string
-  role_id: string
+  role_id: number | string
 }

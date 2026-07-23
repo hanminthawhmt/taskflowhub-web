@@ -27,7 +27,7 @@ import { toast } from 'sonner'
 // Validation schemas
 const addMemberSchema = zod.object({
   user_id: zod.string().min(1, 'User ID is required'),
-  role_id: zod.enum(['owner', 'manager', 'developer', 'viewer']),
+  role_id: zod.enum(['6', '7', '8', '9']),  // project-scope role IDs: 6=Owner, 7=Manager, 8=Developer, 9=Viewer
 })
 
 const createTaskSchema = zod.object({
@@ -71,7 +71,7 @@ export default function ProjectDetailPage() {
     resolver: zodResolver(addMemberSchema),
     defaultValues: {
       user_id: '',
-      role_id: 'developer',
+      role_id: '8',  // Developer by default
     },
   })
 
@@ -92,7 +92,11 @@ export default function ProjectDetailPage() {
   const onAddMemberSubmit = async (data: AddMemberInputs) => {
     try {
       setErrorMsg(null)
-      await addMemberMutation.mutateAsync(data)
+      // Backend requires integer IDs — HTML selects always return strings, so coerce here
+      await addMemberMutation.mutateAsync({
+        user_id: Number(data.user_id),
+        role_id: Number(data.role_id),
+      })
       addMemberForm.reset()
       setMemberModalOpen(false)
       toast.success('Project member added successfully')
@@ -609,10 +613,10 @@ export default function ProjectDetailPage() {
                   {...addMemberForm.register('role_id')}
                   className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                 >
-                  <option value="developer">Developer</option>
-                  <option value="manager">Manager</option>
-                  <option value="viewer">Viewer</option>
-                  <option value="owner">Owner</option>
+                  <option value="8">Developer</option>
+                  <option value="7">Manager</option>
+                  <option value="9">Viewer</option>
+                  <option value="6">Owner</option>
                 </select>
                 {addMemberForm.formState.errors.role_id && (
                   <p className="mt-1.5 text-xs text-red-500">{addMemberForm.formState.errors.role_id.message}</p>
