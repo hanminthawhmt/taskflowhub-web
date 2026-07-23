@@ -60,7 +60,13 @@ export function useAuth() {
       const finalToken = data?.token || ''
 
       setAuth(finalUser, finalToken, activeCompany)
-      navigate('/dashboard', { replace: true })
+      const redirectTo = sessionStorage.getItem('redirectTo')
+      if (redirectTo) {
+        sessionStorage.removeItem('redirectTo')
+        navigate(redirectTo, { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
     },
   })
 
@@ -68,7 +74,13 @@ export function useAuth() {
     mutationFn: (data: RegisterRequest) => authService.register(data),
     onSuccess: (data) => {
       setAuth(data.user, data.token, data.company)
-      navigate('/dashboard', { replace: true })
+      const redirectTo = sessionStorage.getItem('redirectTo')
+      if (redirectTo) {
+        sessionStorage.removeItem('redirectTo')
+        navigate(redirectTo, { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
     },
   })
 

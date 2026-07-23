@@ -77,4 +77,18 @@ export const invitationService = {
     const response = await apiClient.post<AuthResponse>('/auth/login', data)
     return response.data
   },
+
+  /**
+   * POST /projects/:projectId/invitations/:token/accept
+   * Auth required. Accepts a project invitation.
+   */
+  acceptProjectInvitation: async (
+    projectId: number | string,
+    token: string
+  ): Promise<{ message: string }> => {
+    const response = await apiClient.post<{ message: string }>(
+      `/projects/${projectId}/invitations/${token}/accept`
+    )
+    return response.data
+  },
 }

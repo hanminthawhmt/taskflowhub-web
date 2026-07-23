@@ -12,6 +12,7 @@ import BillingPage from '../features/billing/pages/BillingPage'
 import SettingsPage from '../features/settings/pages/SettingsPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import InvitationPage from '../features/invitations/pages/InvitationPage'
+import ProjectInvitationPage from '../features/invitations/pages/ProjectInvitationPage'
 import MembersPage from '../features/members/pages/MembersPage'
 
 export const router = createBrowserRouter([
@@ -71,7 +72,15 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // Public invitation acceptance route — no auth wrapper
+  // Public invitation acceptance routes — no auth wrapper
+  {
+    path: 'invitations/company/:token',
+    element: <InvitationPage />,
+  },
+  {
+    path: 'invitations/project/:projectId/:token',
+    element: <ProjectInvitationPage />,
+  },
   {
     path: 'invitations/:token',
     element: <InvitationPage />,
