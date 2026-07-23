@@ -17,7 +17,7 @@ export default function AuthLayout() {
           </svg>
         </div>
         <h1 className="mt-4 text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-          TaskSaaS
+          Task Flow Hub
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           The collaborative workspace for productive teams

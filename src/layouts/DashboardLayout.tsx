@@ -91,7 +91,7 @@ export default function DashboardLayout() {
         ? location.pathname === '/dashboard'
         : location.pathname.startsWith(item.path)
     )
-  const pageTitle = currentNavItem ? currentNavItem.name : 'TaskSaaS'
+  const pageTitle = currentNavItem ? currentNavItem.name : 'Task Flow Hub'
 
 
   return (
@@ -110,8 +110,8 @@ export default function DashboardLayout() {
               T
             </div>
             {sidebarOpen && (
-              <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                TaskSaaS
+              <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent truncate">
+                Task Flow Hub
               </span>
             )}
           </div>
@@ -221,7 +221,7 @@ export default function DashboardLayout() {
         <div className="fixed inset-0 z-50 flex md:hidden bg-slate-900/40 backdrop-blur-sm">
           <div className="w-64 bg-white dark:bg-slate-900 flex flex-col h-full shadow-xl">
             <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-slate-800">
-              <span className="font-bold text-lg text-blue-600 dark:text-blue-400">TaskSaaS</span>
+              <span className="font-bold text-lg text-blue-600 dark:text-blue-400">Task Flow Hub</span>
               <button
                 onClick={() => setMobileMenuOpen(false)}
                 className="p-1 rounded-md text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"

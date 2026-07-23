@@ -385,7 +385,7 @@ function InvitationShell({ children }: { children: React.ReactNode }) {
           T
         </div>
         <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-          TaskSaaS
+          Task Flow Hub
         </span>
       </div>
       <div className="w-full max-w-md">{children}</div>
