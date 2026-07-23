@@ -1,11 +1,14 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router'
-import { CheckCircle2, ArrowRight, Sparkles, Loader2 } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router'
+import { CheckCircle2, ArrowRight, Sparkles, Loader2, CreditCard } from 'lucide-react'
 import { useAuthStore } from '../../../store/useAuthStore'
 import { useCompanyDetailQuery } from '../../auth/hooks/useAuth'
 
 export default function BillingSuccessPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const sessionId = searchParams.get('session_id')
+
   const activeCompany = useAuthStore((s) => s.activeCompany)
   const setActiveCompany = useAuthStore((s) => s.setActiveCompany)
   const companyId = activeCompany?.id || 1
@@ -34,18 +37,30 @@ export default function BillingSuccessPage() {
         </div>
 
         <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
-          Subscription Upgraded! 🎉
+          Checkout Returned 🎉
         </h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-          Thank you! Your workspace subscription has been updated successfully.
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+          Stripe checkout completed. Payment confirmation is verified asynchronously by server webhooks.
         </p>
+
+        {sessionId && (
+          <div className="mb-6 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-left">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-1">
+              <CreditCard size={13} />
+              <span>Checkout Session Reference</span>
+            </div>
+            <div className="text-xs font-mono text-slate-800 dark:text-slate-200 truncate select-all">
+              {sessionId}
+            </div>
+          </div>
+        )}
 
         {companyDetail && (
           <div className="bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 p-4 rounded-xl mb-6 text-left flex items-center gap-3">
             <Sparkles size={20} className="text-blue-600 dark:text-blue-400 shrink-0" />
             <div>
               <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                Current Plan
+                Current Workspace Plan
               </div>
               <div className="text-sm font-bold text-slate-900 dark:text-white capitalize">
                 {companyDetail.planName || 'Updated'} Plan ({companyDetail.subscriptionStatus || 'active'})
@@ -57,7 +72,7 @@ export default function BillingSuccessPage() {
         {isLoading && (
           <div className="flex items-center justify-center gap-2 text-xs text-slate-400 mb-6">
             <Loader2 size={14} className="animate-spin text-blue-500" />
-            Fetching updated workspace plan details…
+            Fetching workspace subscription details…
           </div>
         )}
 
