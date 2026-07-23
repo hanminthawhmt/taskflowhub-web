@@ -51,18 +51,23 @@ export default function BillingPage() {
   const handlePortalRedirect = async () => {
     try {
       const url = await portalMutation.mutateAsync()
-      window.location.assign(url)
-    } catch {
-      toast.warning('Stripe Billing Portal is not active in this sandbox. Resetting workspace to Free locally.')
-      if (activeCompany) {
-        const updated = {
-          ...activeCompany,
-          planId: 1,
-          planName: 'Free',
-          subscriptionStatus: 'active'
+      if (url) {
+        window.location.href = url
+      } else {
+        toast.error('No billing portal URL returned by the server.')
+      }
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status
+        const msg = err.response?.data?.message
+        if (status === 403) {
+          toast.error('Only the workspace owner can access the billing portal.')
+        } else {
+          toast.error(msg || `Billing portal request failed (status ${status || 'error'}).`)
         }
-        localStorage.setItem('activeCompany', JSON.stringify(updated))
-        setActiveCompany(updated)
+      } else {
+        const msg = err instanceof Error ? err.message : 'Failed to access billing portal.'
+        toast.error(msg)
       }
     }
   }
@@ -70,27 +75,23 @@ export default function BillingPage() {
   const handleUpgrade = async (plan: { id: number; name: string }) => {
     try {
       const url = await checkoutMutation.mutateAsync(plan.id)
-      window.location.assign(url)
-    } catch (err: unknown) {
-      let isPermissionError = false
-      if (axios.isAxiosError(err) && err.response?.status === 403) {
-        isPermissionError = true
-      }
-
-      if (isPermissionError) {
-        toast.error('Only the workspace owner can manage billing subscriptions.')
+      if (url) {
+        window.location.href = url
       } else {
-        toast.success(`Stripe checkout not active. Simulating upgrade to ${plan.name} locally...`)
-        if (activeCompany) {
-          const updated = {
-            ...activeCompany,
-            planId: plan.id,
-            planName: plan.name,
-            subscriptionStatus: 'active'
-          }
-          localStorage.setItem('activeCompany', JSON.stringify(updated))
-          setActiveCompany(updated)
+        toast.error('No checkout URL returned by the server.')
+      }
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status
+        const msg = err.response?.data?.message
+        if (status === 403) {
+          toast.error('Only the workspace owner can manage billing subscriptions.')
+        } else {
+          toast.error(msg || `Upgrade checkout failed (status ${status || 'error'}).`)
         }
+      } else {
+        const msg = err instanceof Error ? err.message : 'Failed to initiate checkout.'
+        toast.error(msg)
       }
     }
   }

@@ -9,6 +9,8 @@ import ProjectsPage from '../features/projects/pages/ProjectsPage'
 import ProjectDetailPage from '../features/projects/pages/ProjectDetailPage'
 import MyTasksPage from '../features/tasks/pages/MyTasksPage'
 import BillingPage from '../features/billing/pages/BillingPage'
+import BillingSuccessPage from '../features/billing/pages/BillingSuccessPage'
+import BillingCancelPage from '../features/billing/pages/BillingCancelPage'
 import SettingsPage from '../features/settings/pages/SettingsPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import InvitationPage from '../features/invitations/pages/InvitationPage'
@@ -65,12 +67,29 @@ export const router = createBrowserRouter([
             element: <BillingPage />,
           },
           {
+            path: 'billing/success',
+            element: <BillingSuccessPage />,
+          },
+          {
+            path: 'billing/cancel',
+            element: <BillingCancelPage />,
+          },
+          {
             path: 'settings',
             element: <SettingsPage />,
           },
         ],
       },
     ],
+  },
+  // Stripe Checkout Return routes (root fallback)
+  {
+    path: 'billing/success',
+    element: <BillingSuccessPage />,
+  },
+  {
+    path: 'billing/cancel',
+    element: <BillingCancelPage />,
   },
   // Public invitation acceptance routes — no auth wrapper
   {
