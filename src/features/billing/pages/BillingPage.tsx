@@ -1,17 +1,48 @@
+import { useEffect } from 'react'
+import { useSearchParams } from 'react-router'
 import { useAuthStore } from '../../../store/useAuthStore'
+import { useCompanyDetailQuery } from '../../auth/hooks/useAuth'
 import { usePortalMutation, useCheckoutMutation, usePlansQuery } from '../hooks/useBilling'
 import { Check, CreditCard, Sparkles, Building } from 'lucide-react'
 import { toast } from 'sonner'
 import axios from 'axios'
 
 export default function BillingPage() {
+  const [searchParams] = useSearchParams()
   const activeCompany = useAuthStore((state) => state.activeCompany)
   const setActiveCompany = useAuthStore((state) => state.setActiveCompany)
 
   const companyId = activeCompany?.id || 1
-  const currentPlanId = activeCompany?.planId || 1
-  const currentPlanName = activeCompany?.planName || 'Free'
-  const currentStatus = activeCompany?.subscriptionStatus || 'active'
+
+  // Fetch real, up-to-date company details from GET /companies/:companyId
+  const {
+    data: companyDetail,
+    isLoading: loadingCompanyDetail,
+    refetch: refetchCompanyDetail,
+  } = useCompanyDetailQuery(companyId)
+
+  // Sync fresh company data into Zustand auth store
+  useEffect(() => {
+    if (companyDetail) {
+      const updated = {
+        ...activeCompany,
+        ...companyDetail,
+      }
+      setActiveCompany(updated)
+    }
+  }, [companyDetail])
+
+  // Refetch company details if returning from Stripe checkout redirect
+  useEffect(() => {
+    if (searchParams.get('session_id') || searchParams.get('success') === 'true') {
+      toast.success('Subscription updated successfully! Refreshing workspace details...')
+      refetchCompanyDetail()
+    }
+  }, [searchParams, refetchCompanyDetail])
+
+  const currentPlanId = companyDetail?.planId ?? activeCompany?.planId ?? 1
+  const currentPlanName = companyDetail?.planName ?? activeCompany?.planName ?? 'Free'
+  const currentStatus = companyDetail?.subscriptionStatus ?? activeCompany?.subscriptionStatus ?? 'active'
 
   const { data: apiPlans, isLoading: loadingPlans } = usePlansQuery()
   const portalMutation = usePortalMutation(companyId)
@@ -99,7 +130,7 @@ export default function BillingPage() {
     },
   }
 
-  const isLoading = loadingPlans || portalMutation.isPending || checkoutMutation.isPending
+  const isLoading = loadingPlans || loadingCompanyDetail || portalMutation.isPending || checkoutMutation.isPending
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-8 animate-fade-in">

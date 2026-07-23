@@ -19,6 +19,15 @@ export function useProfileQuery(enabled = true) {
   })
 }
 
+export function useCompanyDetailQuery(companyId: number | string) {
+  return useQuery({
+    queryKey: ['company', companyId],
+    queryFn: () => authService.getCompanyById(companyId),
+    enabled: !!companyId,
+  })
+}
+
+
 interface NestedUserResponse {
   id: string
   name: string
