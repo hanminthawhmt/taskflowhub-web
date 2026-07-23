@@ -40,6 +40,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem('user', JSON.stringify(user))
     if (company) {
       localStorage.setItem('activeCompany', JSON.stringify(company))
+    } else {
+      localStorage.removeItem('activeCompany')
     }
     set({
       user,

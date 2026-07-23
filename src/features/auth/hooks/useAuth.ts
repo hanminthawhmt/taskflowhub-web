@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { authService } from '../services/auth.service'
 import { useAuthStore } from '../../../store/useAuthStore'
@@ -40,6 +40,7 @@ interface NestedUserResponse {
 
 export function useAuth() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const setAuth = useAuthStore((state) => state.setAuth)
   const clearAuth = useAuthStore((state) => state.clearAuth)
   const user = useAuthStore((state) => state.user)
@@ -49,6 +50,7 @@ export function useAuth() {
   const loginMutation = useMutation({
     mutationFn: (data: LoginRequest) => authService.login(data),
     onSuccess: (data) => {
+      queryClient.clear()
       let activeCompany = data?.company
       const userWithCompany = data?.user as unknown as NestedUserResponse | undefined
 
@@ -82,6 +84,7 @@ export function useAuth() {
   const registerMutation = useMutation({
     mutationFn: (data: RegisterRequest) => authService.register(data),
     onSuccess: (data) => {
+      queryClient.clear()
       setAuth(data.user, data.token, data.company)
       const redirectTo = sessionStorage.getItem('redirectTo')
       if (redirectTo) {
@@ -94,6 +97,7 @@ export function useAuth() {
   })
 
   const logout = () => {
+    queryClient.clear()
     clearAuth()
     navigate('/login', { replace: true })
   }

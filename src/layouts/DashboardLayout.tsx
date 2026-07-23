@@ -42,10 +42,13 @@ export default function DashboardLayout() {
     }
   }, [profile, setUser])
 
-  // Auto-initialize active company context if not set yet
+  // Auto-initialize or validate active company context for current user
   useEffect(() => {
-    if (!activeCompany && apiCompanies && apiCompanies.length > 0) {
-      setActiveCompany(apiCompanies[0])
+    if (apiCompanies && apiCompanies.length > 0) {
+      const isValidCompany = activeCompany && apiCompanies.some((c) => Number(c.id) === Number(activeCompany.id))
+      if (!isValidCompany) {
+        setActiveCompany(apiCompanies[0])
+      }
     }
   }, [activeCompany, apiCompanies, setActiveCompany])
 
