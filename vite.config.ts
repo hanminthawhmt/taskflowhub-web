@@ -15,9 +15,9 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'https://taskflowhub-935i.onrender.com',
         changeOrigin: true,
-        secure: false,
+        secure: true,
       },
     },
   },
