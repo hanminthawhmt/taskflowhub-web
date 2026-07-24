@@ -2,7 +2,8 @@ import axios from 'axios'
 import { apiClient } from '../../../api/client'
 import type { AuthResponse } from '../../auth/types/auth'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+const env = (import.meta as unknown as { env?: Record<string, string> }).env
+const API_BASE_URL = env?.VITE_API_BASE_URL || '/api/v1'
 
 // Plain axios instance with NO auth interceptor for public invitation endpoints
 const publicClient = axios.create({
