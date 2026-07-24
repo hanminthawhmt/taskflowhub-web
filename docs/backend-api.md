@@ -153,10 +153,31 @@ PATCH /projects/:projectId/tasks/:taskId/status
                         "update_any_task" permission logic is added)
   Response: { message, data: task }
 
-[NOT YET BUILT] GET /:projectId/tasks — list ALL tasks in a project (not just "mine")
-[NOT YET BUILT] GET /:projectId/tasks/:taskId — single task detail
-[NOT YET BUILT] PATCH /:projectId/tasks/:taskId — update task fields (title, description, priority, dates, reassignment)
-[NOT YET BUILT] DELETE /:projectId/tasks/:taskId — delete a task
+PATCH /api/v1/projects/:projectId/tasks/:taskId
+  Auth: required | project membership + "update_any_task" permission (Owner/Manager only)
+  Body: { title?, description?, priority?, start_date?, end_date?, user_id? }
+  Response: { message: "Task updated successfully", data: task }
+
+DELETE /api/v1/projects/:projectId/tasks/:taskId
+  Auth: required | project membership + "delete_task" permission (Owner/Manager only)
+  Response: { message: "Task deleted successfully" }
+
+DELETE /api/v1/companies/:companyId/projects/:projectId/members/:userId
+  Auth: required | company membership + project membership + "remove_project_member" permission
+  Response: { message: "Member removed successfully" }
+  Note: Returns 400 if attempting to remove the last remaining project Owner.
+
+GET /api/v1/companies/:companyId/invitations
+DELETE /api/v1/companies/:companyId/invitations/:invitationId
+  Auth: required | company membership + "invite_company_member" permission
+  GET Response: { data: [{ id, email, roleId, roleTitle, invitedBy, expiresAt, createdAt }] }
+  DELETE Response: { message: "Invitation revoked" }
+
+GET /api/v1/projects/:projectId/invitations
+DELETE /api/v1/projects/:projectId/invitations/:invitationId
+  Auth: required | project membership + "invite_project_member" permission
+  GET Response: { data: [{ id, email, roleId, roleTitle, invitedBy, expiresAt, createdAt }] }
+  DELETE Response: { message: "Invitation revoked" }
 
 
 BILLING

@@ -66,3 +66,33 @@ export function useDeleteProjectMutation(companyId: number | string) {
   })
 }
 
+export function useRemoveProjectMemberMutation(companyId: number | string, projectId: number | string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (userId: number | string) =>
+      projectService.removeProjectMember(companyId, projectId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-members', companyId, projectId] })
+    },
+  })
+}
+
+export function useProjectPendingInvitationsQuery(projectId: number | string) {
+  return useQuery({
+    queryKey: ['project-invitations', projectId],
+    queryFn: () => projectService.getProjectPendingInvitations(projectId),
+    enabled: !!projectId,
+  })
+}
+
+export function useRevokeProjectInvitationMutation(projectId: number | string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (invitationId: number | string) =>
+      projectService.revokeProjectInvitation(projectId, invitationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-invitations', projectId] })
+    },
+  })
+}
+

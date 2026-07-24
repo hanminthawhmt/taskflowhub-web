@@ -53,4 +53,23 @@ export const companyMemberService = {
     )
     return response.data
   },
+
+  /**
+   * GET /companies/:companyId/invitations
+   * Auth required, requires "invite_company_member" permission.
+   */
+  getPendingInvitations: async (companyId: number | string) => {
+    const response = await apiClient.get<{ data: any[] }>(
+      `/companies/${companyId}/invitations`
+    )
+    return response.data.data || []
+  },
+
+  /**
+   * DELETE /companies/:companyId/invitations/:invitationId
+   * Auth required, requires "invite_company_member" permission.
+   */
+  revokeInvitation: async (companyId: number | string, invitationId: number | string) => {
+    await apiClient.delete(`/companies/${companyId}/invitations/${invitationId}`)
+  },
 }

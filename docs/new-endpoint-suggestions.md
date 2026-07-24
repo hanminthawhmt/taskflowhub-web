@@ -1,6 +1,8 @@
-# New Endpoint Suggestions
-
-This document lists the recommended API endpoints currently missing from the backend API that are necessary or highly beneficial for standard frontend workflows.
+### 0. Invitation History Endpoint (Accepted / Expired / Revoked)
+- **Proposed Endpoint**: `GET /companies/:companyId/invitations/history` / `GET /projects/:projectId/invitations/history`
+- **Method**: `GET`
+- **Auth Required**: Yes
+- **Description**: Currently `GET /companies/:companyId/invitations` and `GET /projects/:projectId/invitations` only return invitations with status `"pending"`. An endpoint to fetch past accepted, expired, or revoked invitations is needed to display audit logs or full invitation history in workspace settings.
 
 ---
 

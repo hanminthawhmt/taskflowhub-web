@@ -1,5 +1,5 @@
 import { apiClient } from '../../../api/client'
-import type { Task, CreateTaskRequest, UpdateTaskStatusRequest } from '../types/task'
+import type { Task, CreateTaskRequest, UpdateTaskStatusRequest, UpdateTaskRequest } from '../types/task'
 
 const TASKS_LOCAL_KEY = 'mock_project_tasks'
 
@@ -136,6 +136,18 @@ export const taskService = {
     }
 
     return updatedTask
+  },
+
+  updateTask: async (projectId: number | string, taskId: number | string, data: UpdateTaskRequest): Promise<Task> => {
+    const response = await apiClient.patch<{ message: string; data: Task }>(
+      `/projects/${projectId}/tasks/${taskId}`,
+      data
+    )
+    return response.data.data
+  },
+
+  deleteTask: async (projectId: number | string, taskId: number | string): Promise<void> => {
+    await apiClient.delete<{ message: string }>(`/projects/${projectId}/tasks/${taskId}`)
   },
 
   getProjectTasks: async (projectId: number | string): Promise<Task[]> => {

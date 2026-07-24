@@ -4,8 +4,22 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as zod from 'zod'
 import { useAuthStore } from '../../../store/useAuthStore'
-import { useProjectDetail, useProjectMembers, useAddProjectMemberMutation, useCompanyMembers } from '../hooks/useProjects'
-import { useProjectTasks, useCreateTaskMutation, useUpdateTaskStatusMutation } from '../../tasks/hooks/useTasks'
+import {
+  useProjectDetail,
+  useProjectMembers,
+  useAddProjectMemberMutation,
+  useCompanyMembers,
+  useRemoveProjectMemberMutation,
+  useProjectPendingInvitationsQuery,
+  useRevokeProjectInvitationMutation,
+} from '../hooks/useProjects'
+import {
+  useProjectTasks,
+  useCreateTaskMutation,
+  useUpdateTaskStatusMutation,
+  useUpdateTaskMutation,
+  useDeleteTaskMutation,
+} from '../../tasks/hooks/useTasks'
 import {
   ArrowLeft,
   Users,
@@ -24,11 +38,17 @@ import {
   List,
   Download,
   Filter,
-  GripVertical
+  GripVertical,
+  Edit3,
+  Trash2,
+  UserX,
+  Mail,
+  Send,
 } from 'lucide-react'
 import axios from 'axios'
 import { toast } from 'sonner'
 import { exportToCSV } from '../../../utils/csvExport'
+import type { Task } from '../../tasks/types/task'
 
 // Validation schemas
 const addMemberSchema = zod.object({
@@ -59,15 +79,37 @@ export default function ProjectDetailPage() {
   const { data: companyMembers } = useCompanyMembers(companyId)
   const { data: tasks, isLoading: tasksLoading, isError: tasksError, refetch: refetchTasks } = useProjectTasks(projectId || '')
 
-  // Mutations
+  // Mutations & Queries
   const addMemberMutation = useAddProjectMemberMutation(companyId, projectId || '')
+  const removeMemberMutation = useRemoveProjectMemberMutation(companyId, projectId || '')
+  const { data: projectInvitations } = useProjectPendingInvitationsQuery(projectId || '')
+  const revokeProjectInviteMutation = useRevokeProjectInvitationMutation(projectId || '')
+
   const createTaskMutation = useCreateTaskMutation(projectId || '')
   const updateTaskStatusMutation = useUpdateTaskStatusMutation(projectId || '')
+  const updateTaskMutation = useUpdateTaskMutation(projectId || '')
+  const deleteTaskMutation = useDeleteTaskMutation(projectId || '')
+
+  const currentUser = useAuthStore((state) => state.user)
+
+  // Determine current user permissions in this project
+  const currentUserMember = members?.find((m) => Number(m.userId) === Number(currentUser?.id))
+  const userRoleId = Number(currentUserMember?.roleId)
+  const userRoleTitle = (currentUserMember?.roleTitle || '').toLowerCase()
+  // "update_any_task" & "delete_task" permissions are granted to Owner and Manager roles only
+  const canManageTasks =
+    userRoleId === 6 ||
+    userRoleId === 7 ||
+    userRoleId === 1 ||
+    userRoleId === 3 ||
+    userRoleTitle.includes('owner') ||
+    userRoleTitle.includes('manager')
 
   // Component local states
   const [activeTab, setActiveTab] = useState<'overview' | 'members' | 'tasks'>('overview')
   const [memberModalOpen, setMemberModalOpen] = useState(false)
   const [taskModalOpen, setTaskModalOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [taskErrorMsg, setTaskErrorMsg] = useState<string | null>(null)
   const [taskSearchQuery, setTaskSearchQuery] = useState('')
@@ -137,6 +179,47 @@ export default function ProjectDetailPage() {
       } else {
         setTaskErrorMsg('An unexpected error occurred.')
       }
+    }
+  }
+
+  const handleTaskDelete = async (taskId: number | string, title: string) => {
+    if (!window.confirm(`Are you sure you want to delete task "${title}"? This action cannot be undone.`)) {
+      return
+    }
+    try {
+      await deleteTaskMutation.mutateAsync(taskId)
+      toast.success('Task deleted successfully')
+    } catch {
+      toast.error('Failed to delete task')
+    }
+  }
+
+  const handleRemoveMember = async (userId: number | string, name: string) => {
+    if (!window.confirm(`Remove ${name} from this project?`)) {
+      return
+    }
+    try {
+      await removeMemberMutation.mutateAsync(userId)
+      toast.success('Member removed successfully')
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const message = err.response?.data?.message || 'Failed to remove member'
+        toast.error(message)
+      } else {
+        toast.error('An unexpected error occurred')
+      }
+    }
+  }
+
+  const handleRevokeProjectInvite = async (invitationId: number | string, email: string) => {
+    if (!window.confirm(`Revoke invitation for ${email}?`)) {
+      return
+    }
+    try {
+      await revokeProjectInviteMutation.mutateAsync(invitationId)
+      toast.success('Invitation revoked')
+    } catch {
+      toast.error('Failed to revoke invitation')
     }
   }
 
@@ -376,7 +459,7 @@ export default function ProjectDetailPage() {
                           <span className="font-semibold text-slate-900 dark:text-slate-200">{member.user.name}</span>
                         </td>
                         <td className="py-3.5 px-4 text-slate-500 dark:text-slate-400">{member.user.email}</td>
-                        <td className="py-3.5 px-4 text-right">
+                        <td className="py-3.5 px-4 text-right flex items-center justify-end gap-3">
                           <span
                             className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded-full border ${
                               (() => {
@@ -394,6 +477,14 @@ export default function ProjectDetailPage() {
                             <Shield size={12} />
                             <span className="capitalize">{member.roleTitle || member.roleId}</span>
                           </span>
+
+                          <button
+                            onClick={() => handleRemoveMember(member.userId, member.user.name)}
+                            className="p-1 rounded text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                            title="Remove project member"
+                          >
+                            <UserX size={15} />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -406,6 +497,73 @@ export default function ProjectDetailPage() {
                 <p className="text-sm text-slate-500">No project members listed.</p>
               </div>
             )}
+
+            {/* Pending Project Invitations Sub-Section */}
+            <div className="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                    <Send size={16} className="text-blue-500" />
+                    <span>Pending Invitations</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Invitations sent to email addresses that have not been accepted yet.
+                  </p>
+                </div>
+                <span className="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400 rounded-full border border-blue-100 dark:border-blue-900/50">
+                  {projectInvitations?.length || 0} Pending
+                </span>
+              </div>
+
+              {projectInvitations && projectInvitations.length > 0 ? (
+                <div className="overflow-x-auto border border-slate-200/60 dark:border-slate-800 rounded-xl">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase tracking-wider font-semibold">
+                        <th className="py-2.5 px-4">Invitee Email</th>
+                        <th className="py-2.5 px-4">Role</th>
+                        <th className="py-2.5 px-4">Invited By</th>
+                        <th className="py-2.5 px-4">Expires</th>
+                        <th className="py-2.5 px-4 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {projectInvitations.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-200 flex items-center gap-2">
+                            <Mail size={14} className="text-slate-400" />
+                            <span>{inv.email}</span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 font-bold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                              {inv.roleTitle}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-500">
+                            {inv.invitedBy?.name || inv.invitedBy?.email || 'Admin'}
+                          </td>
+                          <td className="py-3 px-4 text-slate-400">
+                            {new Date(inv.expiresAt).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => handleRevokeProjectInvite(inv.id, inv.email)}
+                              className="px-2.5 py-1 text-[11px] font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 hover:bg-red-100 rounded-md transition-colors cursor-pointer"
+                            >
+                              Revoke
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-xs text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                  No pending invitations for this project.
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -591,21 +749,33 @@ export default function ProjectDetailPage() {
                                 }`}>
                                   {task.priority}
                                 </span>
-                                {(() => {
-                                  const dDate = task.endDate || task.startDate
-                                  return dDate ? (
-                                    <span className="text-[10px] text-slate-400">
-                                      Due: {new Date(dDate).toLocaleDateString()}
-                                    </span>
-                                  ) : null
-                                })()}
                               </div>
 
-                              {assigneeUser && assigneeName && (
-                                <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase shadow-sm" title={assigneeName}>
-                                  {assigneeName.charAt(0)}
-                                </div>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {canManageTasks && (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => setEditingTask(task)}
+                                      className="p-1 rounded text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                                      title="Edit Task"
+                                    >
+                                      <Edit3 size={13} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleTaskDelete(task.id, task.title)}
+                                      className="p-1 rounded text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                                      title="Delete Task"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+                                )}
+                                {assigneeUser && assigneeName && (
+                                  <div className="h-5 w-5 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-[9px] font-bold text-blue-600 dark:text-blue-400 uppercase shadow-sm" title={assigneeName}>
+                                    {assigneeName.charAt(0)}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )
@@ -1010,6 +1180,165 @@ export default function ProjectDetailPage() {
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal Dialog */}
+      {editingTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-lg font-bold text-slate-950 dark:text-white flex items-center gap-2">
+                <Edit3 size={18} className="text-blue-500" />
+                <span>Edit Task</span>
+              </h3>
+              <button
+                onClick={() => setEditingTask(null)}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                const title = formData.get('title') as string
+                const description = formData.get('description') as string
+                const priority = formData.get('priority') as 'high' | 'medium' | 'low'
+                const user_id_str = formData.get('user_id') as string
+                const start_date = formData.get('start_date') as string
+                const end_date = formData.get('end_date') as string
+
+                try {
+                  await updateTaskMutation.mutateAsync({
+                    taskId: editingTask.id,
+                    data: {
+                      title: title || undefined,
+                      description: description || undefined,
+                      priority: priority || undefined,
+                      user_id: user_id_str ? Number(user_id_str) : undefined,
+                      start_date: start_date || undefined,
+                      end_date: end_date || undefined,
+                    },
+                  })
+                  setEditingTask(null)
+                  toast.success('Task updated successfully')
+                } catch (err: unknown) {
+                  if (axios.isAxiosError(err)) {
+                    toast.error(err.response?.data?.message || 'Failed to update task')
+                  } else {
+                    toast.error('An error occurred while updating task')
+                  }
+                }
+              }}
+              className="px-6 py-4 space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Task Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  defaultValue={editingTask.title}
+                  required
+                  className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  defaultValue={editingTask.description || ''}
+                  rows={3}
+                  className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Priority
+                  </label>
+                  <select
+                    name="priority"
+                    defaultValue={editingTask.priority}
+                    className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none"
+                  >
+                    <option value="low">Low Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="high">High Priority</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Assignee User
+                  </label>
+                  <select
+                    name="user_id"
+                    defaultValue={editingTask.assignee?.id || editingTask.user_id || ''}
+                    className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none"
+                  >
+                    <option value="">Unassigned</option>
+                    {members?.map((m) => (
+                      <option key={m.userId} value={String(m.userId)}>
+                        {m.user.name} ({m.roleTitle || m.roleId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    name="start_date"
+                    defaultValue={editingTask.startDate ? editingTask.startDate.slice(0, 10) : ''}
+                    className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    End Date / Due Date
+                  </label>
+                  <input
+                    type="date"
+                    name="end_date"
+                    defaultValue={editingTask.endDate ? editingTask.endDate.slice(0, 10) : ''}
+                    className="mt-1.5 block w-full px-4 py-2.5 bg-gray-50 border border-slate-200 dark:border-slate-800 dark:bg-gray-900 dark:text-white rounded-lg text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingTask(null)}
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-semibold rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateTaskMutation.isPending}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg cursor-pointer disabled:opacity-50"
+                >
+                  {updateTaskMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

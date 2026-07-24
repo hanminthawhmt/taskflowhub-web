@@ -30,3 +30,12 @@ export interface CreateTaskRequest {
 export interface UpdateTaskStatusRequest {
   status: 'pending' | 'complete'
 }
+
+export interface UpdateTaskRequest {
+  title?: string
+  description?: string
+  priority?: 'high' | 'medium' | 'low'
+  start_date?: string
+  end_date?: string
+  user_id?: number
+}

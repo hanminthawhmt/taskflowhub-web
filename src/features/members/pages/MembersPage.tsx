@@ -22,7 +22,12 @@ import {
 import { toast } from 'sonner'
 import axios from 'axios'
 import { useAuthStore } from '../../../store/useAuthStore'
-import { useCompanyMembersQuery, useInviteMemberMutation } from '../hooks/useMembers'
+import {
+  useCompanyMembersQuery,
+  useInviteMemberMutation,
+  useCompanyPendingInvitationsQuery,
+  useRevokeCompanyInvitationMutation,
+} from '../hooks/useMembers'
 import type { CompanyMember } from '../services/company-member.service'
 import { exportToCSV } from '../../../utils/csvExport'
 
@@ -97,8 +102,11 @@ export default function MembersPage() {
   const companyId = activeCompany?.id ?? 1
 
   const { data: members, isLoading, isError, refetch } = useCompanyMembersQuery(companyId)
+  const { data: pendingInvitations, isLoading: invitesLoading } = useCompanyPendingInvitationsQuery(companyId)
   const inviteMutation = useInviteMemberMutation(companyId)
+  const revokeMutation = useRevokeCompanyInvitationMutation(companyId)
 
+  const [activeTab, setActiveTab] = useState<'members' | 'invitations'>('members')
   const [searchQuery, setSearchQuery] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [rolesGuideOpen, setRolesGuideOpen] = useState(false)
@@ -302,8 +310,42 @@ export default function MembersPage() {
         })}
       </div>
 
-      {/* Search + table card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
+      {/* Tabs Switcher: Members vs Pending Invitations */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 mb-6">
+        <button
+          onClick={() => setActiveTab('members')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
+            activeTab === 'members'
+              ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Users size={16} />
+          <span>Active Members</span>
+          <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+            {members?.length || 0}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('invitations')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors cursor-pointer ${
+            activeTab === 'invitations'
+              ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+              : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+          }`}
+        >
+          <Send size={16} />
+          <span>Pending Invitations</span>
+          <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400 font-bold">
+            {pendingInvitations?.length || 0}
+          </span>
+        </button>
+      </div>
+
+      {activeTab === 'members' ? (
+        /* Search + table card */
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden">
 
         {/* Search bar */}
         <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
@@ -395,6 +437,96 @@ export default function MembersPage() {
           </ul>
         )}
       </div>
+      ) : (
+        /* Pending Invitations Table Card */
+        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-sm overflow-hidden p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div>
+              <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                <Send size={18} className="text-blue-500" />
+                <span>Pending Workspace Invitations</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Outstanding invitation emails sent to future team members.
+              </p>
+            </div>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer"
+            >
+              <UserPlus size={14} />
+              <span>Send New Invite</span>
+            </button>
+          </div>
+
+          {invitesLoading ? (
+            <div className="space-y-3 animate-pulse py-4">
+              <div className="h-10 bg-slate-100 dark:bg-slate-800 rounded"></div>
+              <div className="h-10 bg-slate-100 dark:bg-slate-800 rounded"></div>
+            </div>
+          ) : pendingInvitations && pendingInvitations.length > 0 ? (
+            <div className="overflow-x-auto border border-slate-100 dark:border-slate-800 rounded-xl">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 uppercase tracking-wider font-semibold">
+                    <th className="py-3 px-4">Invitee Email</th>
+                    <th className="py-3 px-4">Assigned Role</th>
+                    <th className="py-3 px-4">Invited By</th>
+                    <th className="py-3 px-4">Sent Date</th>
+                    <th className="py-3 px-4">Expires</th>
+                    <th className="py-3 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {pendingInvitations.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-slate-200 flex items-center gap-2">
+                        <Mail size={14} className="text-slate-400" />
+                        <span>{inv.email}</span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-0.5 font-bold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {inv.roleTitle}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-500">
+                        {inv.invitedBy?.name || inv.invitedBy?.email || 'Admin'}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-400">
+                        {new Date(inv.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3.5 px-4 text-slate-400">
+                        {new Date(inv.expiresAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`Revoke invitation for ${inv.email}?`)) return
+                            try {
+                              await revokeMutation.mutateAsync(inv.id)
+                              toast.success('Invitation revoked')
+                            } catch {
+                              toast.error('Failed to revoke invitation')
+                            }
+                          }}
+                          disabled={revokeMutation.isPending}
+                          className="px-3 py-1 text-xs font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 hover:bg-red-100 rounded-md transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-sm text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+              No pending invitations found for this workspace.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ─── Invite Modal ──────────────────────────────────────────────────── */}
       {modalOpen && (

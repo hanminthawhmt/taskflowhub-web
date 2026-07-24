@@ -1,5 +1,5 @@
 import { apiClient } from '../../../api/client'
-import type { Project, ProjectMember, CreateProjectRequest, AddProjectMemberRequest } from '../types/project'
+import type { Project, ProjectMember, CreateProjectRequest, AddProjectMemberRequest, PendingInvitation } from '../types/project'
 
 const PROJECTS_LOCAL_KEY = 'mock_projects'
 const MEMBERS_LOCAL_KEY = 'mock_project_members'
@@ -305,5 +305,18 @@ export const projectService = {
     const members: Record<string, ProjectMember[]> = JSON.parse(localStorage.getItem(MEMBERS_LOCAL_KEY) || '{}')
     delete members[String(projectId)]
     localStorage.setItem(MEMBERS_LOCAL_KEY, JSON.stringify(members))
+  },
+
+  removeProjectMember: async (companyId: number | string, projectId: number | string, userId: number | string): Promise<void> => {
+    await apiClient.delete(`/companies/${companyId}/projects/${projectId}/members/${userId}`)
+  },
+
+  getProjectPendingInvitations: async (projectId: number | string): Promise<PendingInvitation[]> => {
+    const response = await apiClient.get<{ data: PendingInvitation[] }>(`/projects/${projectId}/invitations`)
+    return response.data.data || []
+  },
+
+  revokeProjectInvitation: async (projectId: number | string, invitationId: number | string): Promise<void> => {
+    await apiClient.delete(`/projects/${projectId}/invitations/${invitationId}`)
   }
 }
